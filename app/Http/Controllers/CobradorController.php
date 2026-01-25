@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cobrador;
+use App\Models\Proyecto;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class CobradorController extends Controller
 {
     public function index()
     {
-        $cobradores = Cobrador::withCount(['clientes', 'cobros'])
+        $cobradores = Cobrador::with('proyecto')->withCount(['clientes', 'cobros'])
             ->orderBy('nombre')
             ->get();
         return view('cobradores.index', compact('cobradores'));
@@ -18,19 +20,24 @@ class CobradorController extends Controller
 
     public function create()
     {
-        return view('cobradores.create');
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        return view('cobradores.create', compact('proyectos'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'proyecto_id' => 'nullable|exists:proyectos,id',
             'nombre' => 'required|string|max:150',
-            'documento' => 'nullable|string|max:20',
+            'documento' => 'required|string|max:20|unique:cobradors,documento',
             'telefono' => 'nullable|string|max:20',
             'celular' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
+            'pin' => 'required|string|min:4|max:6',
             'comision_porcentaje' => 'required|numeric|min:0|max:100',
         ]);
+
+        $validated['pin'] = Hash::make($validated['pin']);
 
         Cobrador::create($validated);
 
@@ -51,20 +58,29 @@ class CobradorController extends Controller
 
     public function edit(Cobrador $cobradore)
     {
-        return view('cobradores.edit', ['cobrador' => $cobradore]);
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        return view('cobradores.edit', ['cobrador' => $cobradore, 'proyectos' => $proyectos]);
     }
 
     public function update(Request $request, Cobrador $cobradore)
     {
         $validated = $request->validate([
+            'proyecto_id' => 'nullable|exists:proyectos,id',
             'nombre' => 'required|string|max:150',
-            'documento' => 'nullable|string|max:20',
+            'documento' => 'required|string|max:20|unique:cobradors,documento,' . $cobradore->id,
             'telefono' => 'nullable|string|max:20',
             'celular' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
+            'pin' => 'nullable|string|min:4|max:6',
             'comision_porcentaje' => 'required|numeric|min:0|max:100',
             'estado' => 'required|in:activo,inactivo',
         ]);
+
+        if (!empty($validated['pin'])) {
+            $validated['pin'] = Hash::make($validated['pin']);
+        } else {
+            unset($validated['pin']);
+        }
 
         $cobradore->update($validated);
 

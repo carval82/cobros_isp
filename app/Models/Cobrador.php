@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Sanctum\HasApiTokens;
 
 class Cobrador extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasApiTokens;
 
     protected $table = 'cobradors';
 
@@ -20,9 +21,14 @@ class Cobrador extends Model
         'telefono',
         'celular',
         'email',
+        'pin',
         'comision_porcentaje',
         'estado',
         'user_id',
+    ];
+
+    protected $hidden = [
+        'pin',
     ];
 
     protected $casts = [
