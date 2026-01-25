@@ -19,13 +19,24 @@
             @method('PUT')
             
             <div class="row g-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <label class="form-label">Proyecto</label>
+                    <select name="proyecto_id" class="form-select">
+                        <option value="">Sin proyecto</option>
+                        @foreach($proyectos as $proyecto)
+                            <option value="{{ $proyecto->id }}" {{ old('proyecto_id', $plan->proyecto_id) == $proyecto->id ? 'selected' : '' }}>
+                                {{ $proyecto->nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-5">
                     <label class="form-label">Nombre *</label>
                     <input type="text" name="nombre" class="form-control @error('nombre') is-invalid @enderror" value="{{ old('nombre', $plan->nombre) }}" required>
                     @error('nombre')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 
-                <div class="col-md-6">
+                <div class="col-md-3">
                     <label class="form-label">Tipo</label>
                     <select name="tipo" class="form-select">
                         <option value="residencial" {{ old('tipo', $plan->tipo) == 'residencial' ? 'selected' : '' }}>Residencial</option>

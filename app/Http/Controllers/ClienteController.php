@@ -4,13 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Cliente;
 use App\Models\Cobrador;
+use App\Models\Proyecto;
 use Illuminate\Http\Request;
 
 class ClienteController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Cliente::with(['cobrador', 'servicios.planServicio']);
+        $query = Cliente::with(['cobrador', 'servicios.planServicio', 'proyecto']);
+
+        if ($request->filled('proyecto_id')) {
+            $query->where('proyecto_id', $request->proyecto_id);
+        }
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->estado);
@@ -27,19 +32,23 @@ class ClienteController extends Controller
         }
 
         $clientes = $query->orderBy('nombre')->paginate(25);
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
 
-        return view('clientes.index', compact('clientes'));
+        return view('clientes.index', compact('clientes', 'proyectos'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $cobradores = Cobrador::where('estado', 'activo')->orderBy('nombre')->get();
-        return view('clientes.create', compact('cobradores'));
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        $proyectoSeleccionado = $request->filled('proyecto_id') ? $request->proyecto_id : null;
+        return view('clientes.create', compact('cobradores', 'proyectos', 'proyectoSeleccionado'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'proyecto_id' => 'nullable|exists:proyectos,id',
             'nombre' => 'required|string|max:150',
             'documento' => 'nullable|string|max:20',
             'tipo_documento' => 'required|string|max:10',
@@ -74,7 +83,8 @@ class ClienteController extends Controller
     public function edit(Cliente $cliente)
     {
         $cobradores = Cobrador::where('estado', 'activo')->orderBy('nombre')->get();
-        return view('clientes.edit', compact('cliente', 'cobradores'));
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        return view('clientes.edit', compact('cliente', 'cobradores', 'proyectos'));
     }
 
     public function update(Request $request, Cliente $cliente)
@@ -95,6 +105,7 @@ class ClienteController extends Controller
             'fecha_instalacion' => 'nullable|date',
             'notas' => 'nullable|string',
             'cobrador_id' => 'nullable|exists:cobradors,id',
+            'proyecto_id' => 'nullable|exists:proyectos,id',
         ]);
 
         $cliente->update($validated);

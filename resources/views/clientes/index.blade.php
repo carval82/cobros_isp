@@ -16,12 +16,22 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
-            <div class="col-md-4">
-                <input type="text" name="buscar" class="form-control" placeholder="Buscar por nombre, código, documento..." value="{{ request('buscar') }}">
+            <div class="col-md-3">
+                <select name="proyecto_id" class="form-select">
+                    <option value="">Todos los proyectos</option>
+                    @foreach($proyectos as $proyecto)
+                        <option value="{{ $proyecto->id }}" {{ request('proyecto_id') == $proyecto->id ? 'selected' : '' }}>
+                            {{ $proyecto->nombre }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-3">
+                <input type="text" name="buscar" class="form-control" placeholder="Buscar nombre, código..." value="{{ request('buscar') }}">
+            </div>
+            <div class="col-md-2">
                 <select name="estado" class="form-select">
-                    <option value="">Todos los estados</option>
+                    <option value="">Estado</option>
                     <option value="activo" {{ request('estado') == 'activo' ? 'selected' : '' }}>Activos</option>
                     <option value="suspendido" {{ request('estado') == 'suspendido' ? 'selected' : '' }}>Suspendidos</option>
                     <option value="cortado" {{ request('estado') == 'cortado' ? 'selected' : '' }}>Cortados</option>
@@ -30,13 +40,11 @@
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-outline-primary w-100">
-                    <i class="fas fa-search me-1"></i>Buscar
+                    <i class="fas fa-search me-1"></i>Filtrar
                 </button>
             </div>
             <div class="col-md-2">
-                <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary w-100">
-                    <i class="fas fa-times me-1"></i>Limpiar
-                </a>
+                <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary w-100">Limpiar</a>
             </div>
         </form>
     </div>
@@ -51,8 +59,8 @@
                     <tr>
                         <th>Código</th>
                         <th>Nombre</th>
+                        <th>Proyecto</th>
                         <th>Dirección</th>
-                        <th>Teléfono</th>
                         <th>Plan</th>
                         <th class="text-center">Estado</th>
                         <th class="text-center">Acciones</th>
@@ -65,8 +73,14 @@
                         <td>
                             <a href="{{ route('clientes.show', $cliente) }}">{{ $cliente->nombre }}</a>
                         </td>
-                        <td>{{ Str::limit($cliente->direccion, 40) }}</td>
-                        <td>{{ $cliente->celular ?: $cliente->telefono ?: '-' }}</td>
+                        <td>
+                            @if($cliente->proyecto)
+                                <span class="badge" style="background-color: {{ $cliente->proyecto->color }};">{{ $cliente->proyecto->nombre }}</span>
+                            @else
+                                <span class="text-muted">-</span>
+                            @endif
+                        </td>
+                        <td>{{ Str::limit($cliente->direccion, 30) }}</td>
                         <td>
                             @if($cliente->servicios->first())
                                 {{ $cliente->servicios->first()->planServicio->nombre ?? '-' }}
@@ -103,7 +117,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
+                        <td colspan="8" class="text-center py-4 text-muted">
                             <i class="fas fa-users fa-2x mb-2 d-block"></i>
                             No se encontraron clientes
                         </td>

@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Cobros ISP')</title>
+    <title>@yield('title', 'INTERVEREDANET - Sistema de Cobros')</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}?v={{ time() }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('favicon.png') }}?v={{ time() }}">
     
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -15,13 +17,17 @@
     
     <style>
         :root {
-            --primary-color: #0d6efd;
-            --sidebar-width: 250px;
+            --primary-color: #0ea5e9;
+            --primary-dark: #0284c7;
+            --sidebar-width: 260px;
+            --sidebar-bg: #0f172a;
+            --sidebar-hover: #1e293b;
+            --accent-color: #38bdf8;
         }
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
+            background-color: #f1f5f9;
         }
         
         .sidebar {
@@ -30,39 +36,59 @@
             left: 0;
             height: 100vh;
             width: var(--sidebar-width);
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            padding-top: 1rem;
+            background: var(--sidebar-bg);
+            padding-top: 0;
             z-index: 1000;
             overflow-y: auto;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
         }
         
         .sidebar .brand {
-            color: white;
-            font-size: 1.5rem;
-            font-weight: bold;
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%);
+            padding: 1.25rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sidebar .brand img {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
         
         .sidebar .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 0.75rem 1.5rem;
+            color: #94a3b8;
+            padding: 0.875rem 1.5rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            transition: all 0.3s;
+            gap: 0.875rem;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            font-size: 0.9rem;
         }
         
-        .sidebar .nav-link:hover,
+        .sidebar .nav-link:hover {
+            color: #f1f5f9;
+            background: var(--sidebar-hover);
+            border-left-color: var(--accent-color);
+        }
+        
         .sidebar .nav-link.active {
-            color: white;
-            background: rgba(255,255,255,0.1);
+            color: #fff;
+            background: linear-gradient(90deg, var(--sidebar-hover) 0%, transparent 100%);
+            border-left-color: var(--accent-color);
         }
         
         .sidebar .nav-link i {
-            width: 20px;
+            width: 22px;
             text-align: center;
+            font-size: 1rem;
+            color: var(--accent-color);
+        }
+        
+        .sidebar .nav-link:hover i,
+        .sidebar .nav-link.active i {
+            color: #fff;
         }
         
         .main-content {
@@ -131,14 +157,19 @@
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
-        <div class="brand">
-            <i class="fas fa-wifi me-2"></i>Cobros ISP
+        <div class="brand text-center">
+            <img src="{{ asset('images/logo.png') }}?v={{ time() }}" alt="INTERVEREDANET" style="max-width: 210px; height: auto;">
         </div>
         
         <ul class="nav flex-column">
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('proyectos.*') ? 'active' : '' }}" href="{{ route('proyectos.index') }}">
+                    <i class="fas fa-project-diagram"></i> Proyectos
                 </a>
             </li>
             <li class="nav-item">

@@ -12,6 +12,28 @@
     </a>
 </div>
 
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <select name="proyecto_id" class="form-select">
+                    <option value="">Todos los proyectos</option>
+                    @foreach($proyectos as $proyecto)
+                        <option value="{{ $proyecto->id }}" {{ request('proyecto_id') == $proyecto->id ? 'selected' : '' }}>
+                            {{ $proyecto->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search me-1"></i>Filtrar</button>
+                <a href="{{ route('planes.index') }}" class="btn btn-outline-secondary">Limpiar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -19,6 +41,7 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
+                        <th>Proyecto</th>
                         <th>Velocidad</th>
                         <th class="text-end">Precio</th>
                         <th>Tipo</th>
@@ -34,6 +57,13 @@
                             <strong>{{ $plan->nombre }}</strong>
                             @if($plan->descripcion)
                                 <br><small class="text-muted">{{ $plan->descripcion }}</small>
+                            @endif
+                        </td>
+                        <td>
+                            @if($plan->proyecto)
+                                <span class="badge" style="background-color: {{ $plan->proyecto->color }};">{{ $plan->proyecto->nombre }}</span>
+                            @else
+                                <span class="text-muted">-</span>
                             @endif
                         </td>
                         <td>
@@ -72,7 +102,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
+                        <td colspan="8" class="text-center py-4 text-muted">
                             <i class="fas fa-box fa-2x mb-2 d-block"></i>
                             No hay planes registrados
                         </td>

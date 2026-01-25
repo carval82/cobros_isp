@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProyectoController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\CobradorController;
 use App\Http\Controllers\PlanServicioController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\LiquidacionController;
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
 // Recursos
+Route::resource('proyectos', ProyectoController::class);
 Route::resource('clientes', ClienteController::class);
 Route::resource('cobradores', CobradorController::class);
 Route::resource('planes', PlanServicioController::class);

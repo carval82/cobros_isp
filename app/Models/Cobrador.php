@@ -14,6 +14,7 @@ class Cobrador extends Model
     protected $table = 'cobradors';
 
     protected $fillable = [
+        'proyecto_id',
         'nombre',
         'documento',
         'telefono',
@@ -27,6 +28,11 @@ class Cobrador extends Model
     protected $casts = [
         'comision_porcentaje' => 'decimal:2',
     ];
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class);
+    }
 
     public function user(): BelongsTo
     {

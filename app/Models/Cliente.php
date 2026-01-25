@@ -12,6 +12,7 @@ class Cliente extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'proyecto_id',
         'codigo',
         'nombre',
         'documento',
@@ -37,6 +38,11 @@ class Cliente extends Model
         'latitud' => 'decimal:8',
         'longitud' => 'decimal:8',
     ];
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class);
+    }
 
     public function cobrador(): BelongsTo
     {

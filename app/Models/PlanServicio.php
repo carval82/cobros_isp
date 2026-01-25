@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PlanServicio extends Model
 {
     protected $fillable = [
+        'proyecto_id',
         'nombre',
         'descripcion',
         'velocidad_bajada',
@@ -21,6 +23,11 @@ class PlanServicio extends Model
         'precio' => 'decimal:2',
         'activo' => 'boolean',
     ];
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class);
+    }
 
     public function servicios(): HasMany
     {
