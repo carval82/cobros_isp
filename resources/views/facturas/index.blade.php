@@ -134,20 +134,31 @@
 <div class="modal fade" id="modalGenerarMes" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form action="{{ route('facturas.generar-mes') }}" method="POST">
+            <form action="{{ route('facturas.generar-mes-proyecto') }}" method="POST">
                 @csrf
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-calendar-plus me-2"></i>Generar Facturas del Mes</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted">Se generarán facturas para todos los servicios activos que no tengan factura en el período seleccionado.</p>
+                    <p class="text-muted">Se generarán facturas automáticamente para todos los servicios activos que no tengan factura en el período seleccionado.</p>
                     <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Proyecto</label>
+                            <select name="proyecto_id" class="form-select">
+                                <option value="">Todos los proyectos</option>
+                                @foreach(\App\Models\Proyecto::where('activo', true)->orderBy('nombre')->get() as $proyecto)
+                                    <option value="{{ $proyecto->id }}">{{ $proyecto->nombre }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="col-6">
                             <label class="form-label">Mes</label>
                             <select name="mes" class="form-select" required>
                                 @for($i = 1; $i <= 12; $i++)
-                                    <option value="{{ $i }}" {{ now()->month == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                    <option value="{{ $i }}" {{ now()->month == $i ? 'selected' : '' }}>
+                                        {{ $i }} - {{ \Carbon\Carbon::create()->month($i)->translatedFormat('F') }}
+                                    </option>
                                 @endfor
                             </select>
                         </div>

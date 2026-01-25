@@ -8,6 +8,12 @@
         <i class="fas fa-file-invoice-dollar me-2"></i>Factura {{ $factura->numero }}
     </h1>
     <div class="btn-group">
+        <a href="{{ route('facturas.pdf', $factura) }}" class="btn btn-danger" target="_blank">
+            <i class="fas fa-file-pdf me-1"></i>Ver PDF
+        </a>
+        <a href="{{ route('facturas.descargar-pdf', $factura) }}" class="btn btn-outline-danger">
+            <i class="fas fa-download me-1"></i>Descargar
+        </a>
         @if($factura->saldo > 0 && $factura->estado !== 'anulada')
         <a href="{{ route('pagos.create', ['factura_id' => $factura->id]) }}" class="btn btn-success">
             <i class="fas fa-dollar-sign me-1"></i>Registrar Pago

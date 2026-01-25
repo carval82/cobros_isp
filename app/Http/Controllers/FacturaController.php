@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Factura;
 use App\Models\Servicio;
+use App\Models\Proyecto;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class FacturaController extends Controller
 {
@@ -167,5 +169,77 @@ class FacturaController extends Controller
 
         return redirect()->route('facturas.index', ['mes' => $validated['mes'], 'anio' => $validated['anio']])
             ->with('success', "Se generaron {$generadas} facturas. {$omitidas} omitidas (ya existían).");
+    }
+
+    public function pdf(Factura $factura)
+    {
+        $factura->load(['cliente.proyecto', 'servicio.planServicio', 'pagos']);
+        
+        $pdf = Pdf::loadView('facturas.pdf.factura', compact('factura'));
+        
+        return $pdf->stream("factura-{$factura->numero}.pdf");
+    }
+
+    public function descargarPdf(Factura $factura)
+    {
+        $factura->load(['cliente.proyecto', 'servicio.planServicio', 'pagos']);
+        
+        $pdf = Pdf::loadView('facturas.pdf.factura', compact('factura'));
+        
+        return $pdf->download("factura-{$factura->numero}.pdf");
+    }
+
+    public function generarMesProyecto(Request $request)
+    {
+        $validated = $request->validate([
+            'mes' => 'required|integer|min:1|max:12',
+            'anio' => 'required|integer|min:2020',
+            'proyecto_id' => 'nullable|exists:proyectos,id',
+        ]);
+
+        $query = Servicio::with(['cliente', 'planServicio'])
+            ->where('estado', 'activo');
+
+        if ($request->filled('proyecto_id')) {
+            $query->whereHas('cliente', function($q) use ($validated) {
+                $q->where('proyecto_id', $validated['proyecto_id']);
+            });
+        }
+
+        $servicios = $query->get();
+
+        $generadas = 0;
+        $omitidas = 0;
+
+        foreach ($servicios as $servicio) {
+            if ($servicio->tieneFacturaMes($validated['mes'], $validated['anio'])) {
+                $omitidas++;
+                continue;
+            }
+
+            $precio = $servicio->precio_mensual;
+            
+            Factura::create([
+                'cliente_id' => $servicio->cliente_id,
+                'servicio_id' => $servicio->id,
+                'mes' => $validated['mes'],
+                'anio' => $validated['anio'],
+                'fecha_emision' => now(),
+                'fecha_vencimiento' => Carbon::create($validated['anio'], $validated['mes'], $servicio->dia_pago_limite),
+                'subtotal' => $precio,
+                'total' => $precio,
+                'saldo' => $precio,
+                'concepto' => "Servicio de Internet - " . $servicio->planServicio->nombre,
+            ]);
+
+            $generadas++;
+        }
+
+        $proyectoNombre = $request->filled('proyecto_id') 
+            ? Proyecto::find($validated['proyecto_id'])->nombre 
+            : 'Todos los proyectos';
+
+        return redirect()->route('facturas.index', ['mes' => $validated['mes'], 'anio' => $validated['anio']])
+            ->with('success', "{$proyectoNombre}: Se generaron {$generadas} facturas. {$omitidas} omitidas.");
     }
 }
