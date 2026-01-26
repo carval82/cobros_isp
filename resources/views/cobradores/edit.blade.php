@@ -19,16 +19,20 @@
             @method('PUT')
             
             <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Proyecto</label>
-                    <select name="proyecto_id" class="form-select">
-                        <option value="">Sin proyecto</option>
+                <div class="col-md-6">
+                    <label class="form-label">Proyectos Asignados</label>
+                    <div class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
                         @foreach($proyectos as $proyecto)
-                            <option value="{{ $proyecto->id }}" {{ old('proyecto_id', $cobrador->proyecto_id) == $proyecto->id ? 'selected' : '' }}>
-                                {{ $proyecto->nombre }}
-                            </option>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="proyectos[]" value="{{ $proyecto->id }}" id="proyecto_{{ $proyecto->id }}"
+                                    {{ in_array($proyecto->id, old('proyectos', $cobrador->proyectos->pluck('id')->toArray())) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="proyecto_{{ $proyecto->id }}">
+                                    <span class="badge" style="background-color: {{ $proyecto->color ?? '#6c757d' }}">{{ $proyecto->nombre }}</span>
+                                </label>
+                            </div>
                         @endforeach
-                    </select>
+                    </div>
+                    <small class="text-muted">Selecciona los proyectos que el cobrador puede gestionar</small>
                 </div>
                 <div class="col-md-5">
                     <label class="form-label">Nombre *</label>

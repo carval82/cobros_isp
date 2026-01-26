@@ -36,6 +36,13 @@ class Proyecto extends Model
         return $this->hasMany(Cobrador::class);
     }
 
+    public function cobradoresAsignados()
+    {
+        return $this->belongsToMany(Cobrador::class, 'cobrador_proyecto')
+            ->withPivot('comision_porcentaje')
+            ->withTimestamps();
+    }
+
     public function getTotalClientesAttribute()
     {
         return $this->clientes()->count();

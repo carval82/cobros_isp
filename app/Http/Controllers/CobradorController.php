@@ -27,7 +27,8 @@ class CobradorController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'proyecto_id' => 'nullable|exists:proyectos,id',
+            'proyectos' => 'nullable|array',
+            'proyectos.*' => 'exists:proyectos,id',
             'nombre' => 'required|string|max:150',
             'documento' => 'required|string|max:20|unique:cobradors,documento',
             'telefono' => 'nullable|string|max:20',
@@ -38,8 +39,15 @@ class CobradorController extends Controller
         ]);
 
         $validated['pin'] = Hash::make($validated['pin']);
+        
+        // Extraer proyectos antes de crear
+        $proyectos = $validated['proyectos'] ?? [];
+        unset($validated['proyectos']);
 
-        Cobrador::create($validated);
+        $cobrador = Cobrador::create($validated);
+        
+        // Sincronizar proyectos asignados
+        $cobrador->proyectos()->sync($proyectos);
 
         return redirect()->route('cobradores.index')
             ->with('success', 'Cobrador creado correctamente');
@@ -58,6 +66,7 @@ class CobradorController extends Controller
 
     public function edit(Cobrador $cobradore)
     {
+        $cobradore->load('proyectos');
         $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
         return view('cobradores.edit', ['cobrador' => $cobradore, 'proyectos' => $proyectos]);
     }
@@ -65,7 +74,8 @@ class CobradorController extends Controller
     public function update(Request $request, Cobrador $cobradore)
     {
         $validated = $request->validate([
-            'proyecto_id' => 'nullable|exists:proyectos,id',
+            'proyectos' => 'nullable|array',
+            'proyectos.*' => 'exists:proyectos,id',
             'nombre' => 'required|string|max:150',
             'documento' => 'required|string|max:20|unique:cobradors,documento,' . $cobradore->id,
             'telefono' => 'nullable|string|max:20',
@@ -82,7 +92,14 @@ class CobradorController extends Controller
             unset($validated['pin']);
         }
 
+        // Extraer proyectos antes de actualizar
+        $proyectos = $validated['proyectos'] ?? [];
+        unset($validated['proyectos']);
+
         $cobradore->update($validated);
+        
+        // Sincronizar proyectos asignados
+        $cobradore->proyectos()->sync($proyectos);
 
         return redirect()->route('cobradores.index')
             ->with('success', 'Cobrador actualizado correctamente');

@@ -44,6 +44,15 @@ class CobradorAppController extends Controller
 
         $token = $cobrador->createToken('cobrador-app')->plainTextToken;
 
+        // Obtener proyectos asignados
+        $proyectos = $cobrador->proyectos()->get(['proyectos.id', 'proyectos.nombre', 'proyectos.color']);
+        
+        // Si no tiene proyectos en la tabla pivot, usar el proyecto_id directo
+        if ($proyectos->isEmpty() && $cobrador->proyecto_id) {
+            $proyectos = \App\Models\Proyecto::where('id', $cobrador->proyecto_id)
+                ->get(['id', 'nombre', 'color']);
+        }
+
         return response()->json([
             'success' => true,
             'cobrador' => [
@@ -52,8 +61,161 @@ class CobradorAppController extends Controller
                 'documento' => $cobrador->documento,
                 'proyecto_id' => $cobrador->proyecto_id,
                 'comision_porcentaje' => $cobrador->comision_porcentaje,
+                'proyectos' => $proyectos,
             ],
             'token' => $token,
+        ]);
+    }
+
+    public function proyectos(Request $request)
+    {
+        $cobrador = $request->user();
+        
+        // Obtener proyectos de la tabla pivot
+        $proyectos = $cobrador->proyectos()
+            ->withCount('clientes')
+            ->get()
+            ->map(function($proyecto) use ($cobrador) {
+                $clientesCobrador = Cliente::where('proyecto_id', $proyecto->id)
+                    ->where('cobrador_id', $cobrador->id)
+                    ->count();
+                    
+                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto, $cobrador) {
+                    $q->where('proyecto_id', $proyecto->id)
+                      ->where('cobrador_id', $cobrador->id);
+                })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count();
+                
+                return [
+                    'id' => $proyecto->id,
+                    'nombre' => $proyecto->nombre,
+                    'color' => $proyecto->color,
+                    'ubicacion' => $proyecto->ubicacion,
+                    'comision_porcentaje' => $proyecto->pivot->comision_porcentaje ?? $cobrador->comision_porcentaje,
+                    'clientes_asignados' => $clientesCobrador,
+                    'facturas_pendientes' => $facturasPendientes,
+                ];
+            });
+        
+        // Si no tiene proyectos en pivot, usar proyecto_id directo
+        if ($proyectos->isEmpty() && $cobrador->proyecto_id) {
+            $proyecto = \App\Models\Proyecto::find($cobrador->proyecto_id);
+            if ($proyecto) {
+                $clientesCobrador = Cliente::where('proyecto_id', $proyecto->id)
+                    ->where('cobrador_id', $cobrador->id)
+                    ->count();
+                    
+                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto, $cobrador) {
+                    $q->where('proyecto_id', $proyecto->id)
+                      ->where('cobrador_id', $cobrador->id);
+                })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count();
+                
+                $proyectos = collect([[
+                    'id' => $proyecto->id,
+                    'nombre' => $proyecto->nombre,
+                    'color' => $proyecto->color,
+                    'ubicacion' => $proyecto->ubicacion,
+                    'comision_porcentaje' => $cobrador->comision_porcentaje,
+                    'clientes_asignados' => $clientesCobrador,
+                    'facturas_pendientes' => $facturasPendientes,
+                ]]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'proyectos' => $proyectos,
+        ]);
+    }
+
+    public function syncProyecto(Request $request, $proyecto_id)
+    {
+        $cobrador = $request->user();
+        $lastSync = $request->input('last_sync');
+
+        // Verificar que el cobrador tiene acceso al proyecto
+        $tieneAcceso = $cobrador->proyectos()->where('proyectos.id', $proyecto_id)->exists() 
+            || $cobrador->proyecto_id == $proyecto_id;
+            
+        if (!$tieneAcceso) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes acceso a este proyecto'
+            ], 403);
+        }
+
+        $query = Cliente::with(['proyecto', 'servicios.planServicio'])
+            ->where('proyecto_id', $proyecto_id)
+            ->where('cobrador_id', $cobrador->id)
+            ->where('estado', 'activo');
+
+        if ($lastSync) {
+            $query->where('updated_at', '>', $lastSync);
+        }
+
+        $clientes = $query->get()->map(function($cliente) {
+            return [
+                'id' => $cliente->id,
+                'codigo' => $cliente->codigo,
+                'nombre' => $cliente->nombre,
+                'documento' => $cliente->documento,
+                'celular' => $cliente->celular,
+                'telefono' => $cliente->telefono,
+                'direccion' => $cliente->direccion,
+                'barrio' => $cliente->barrio,
+                'referencia_ubicacion' => $cliente->referencia_ubicacion,
+                'latitud' => $cliente->latitud,
+                'longitud' => $cliente->longitud,
+                'proyecto_id' => $cliente->proyecto_id,
+                'proyecto_nombre' => $cliente->proyecto?->nombre,
+                'servicio' => $cliente->servicios->first() ? [
+                    'id' => $cliente->servicios->first()->id,
+                    'plan_nombre' => $cliente->servicios->first()->planServicio->nombre ?? 'Sin plan',
+                    'precio' => $cliente->servicios->first()->precio_mensual,
+                ] : null,
+                'updated_at' => $cliente->updated_at->toISOString(),
+            ];
+        });
+
+        $facturasPendientes = Factura::with('cliente')
+            ->whereHas('cliente', function($q) use ($cobrador, $proyecto_id) {
+                $q->where('cobrador_id', $cobrador->id)
+                  ->where('proyecto_id', $proyecto_id);
+            })
+            ->whereIn('estado', ['pendiente', 'parcial', 'vencida'])
+            ->get()
+            ->map(function($factura) {
+                return [
+                    'id' => $factura->id,
+                    'numero' => $factura->numero,
+                    'cliente_id' => $factura->cliente_id,
+                    'cliente_nombre' => $factura->cliente->nombre,
+                    'mes' => $factura->mes,
+                    'anio' => $factura->anio,
+                    'periodo' => $factura->periodo,
+                    'total' => $factura->total,
+                    'saldo' => $factura->saldo,
+                    'estado' => $factura->estado,
+                    'fecha_vencimiento' => $factura->fecha_vencimiento->format('Y-m-d'),
+                    'updated_at' => $factura->updated_at->toISOString(),
+                ];
+            });
+
+        $planes = PlanServicio::where('activo', true)
+            ->where(function($q) use ($proyecto_id) {
+                $q->whereNull('proyecto_id')
+                  ->orWhere('proyecto_id', $proyecto_id);
+            })
+            ->get(['id', 'nombre', 'velocidad_bajada', 'velocidad_subida', 'precio']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'proyecto_id' => $proyecto_id,
+                'clientes' => $clientes,
+                'facturas_pendientes' => $facturasPendientes,
+                'planes' => $planes,
+                'server_time' => now()->toISOString(),
+            ]
         ]);
     }
 
