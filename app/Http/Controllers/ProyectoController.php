@@ -12,7 +12,7 @@ class ProyectoController extends Controller
 {
     public function index()
     {
-        $proyectos = Proyecto::withCount(['clientes', 'planes', 'cobradores'])
+        $proyectos = Proyecto::withCount(['clientes', 'planes', 'cobradoresAsignados'])
             ->orderBy('nombre')
             ->get();
 
@@ -46,13 +46,13 @@ class ProyectoController extends Controller
     {
         $proyecto->load(['clientes' => function($q) {
             $q->with('servicios.planServicio')->orderBy('nombre');
-        }, 'planes', 'cobradores']);
+        }, 'planes', 'cobradoresAsignados']);
 
         $estadisticas = [
             'total_clientes' => $proyecto->clientes->count(),
             'clientes_activos' => $proyecto->clientes->where('estado', 'activo')->count(),
             'total_planes' => $proyecto->planes->count(),
-            'total_cobradores' => $proyecto->cobradores->count(),
+            'total_cobradores' => $proyecto->cobradoresAsignados->count(),
         ];
 
         $mes = now()->month;

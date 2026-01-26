@@ -41,7 +41,7 @@
                         <small class="text-muted">Planes</small>
                     </div>
                     <div class="col-4">
-                        <div class="fw-bold text-info fs-4">{{ $proyecto->cobradores_count }}</div>
+                        <div class="fw-bold text-info fs-4">{{ $proyecto->cobradores_asignados_count }}</div>
                         <small class="text-muted">Cobradores</small>
                     </div>
                 </div>
