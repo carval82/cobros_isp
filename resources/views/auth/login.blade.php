@@ -163,10 +163,7 @@
     <div class="login-container">
         <div class="login-card">
             <div class="logo-container">
-                <div class="logo-circle">
-                    <i class="fas fa-wifi"></i>
-                </div>
-                <h1 class="brand-name">INTERVEREDANET</h1>
+                <img src="{{ asset('images/logo.png') }}" alt="INTERVEREDANET" style="max-width: 280px; height: auto; margin-bottom: 20px;">
                 <p class="brand-subtitle">Sistema de Gestión de Cobros</p>
             </div>
             
