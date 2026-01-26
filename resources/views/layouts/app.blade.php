@@ -212,6 +212,20 @@
                     <i class="fas fa-calculator"></i> Liquidaciones
                 </a>
             </li>
+            
+            <li class="nav-item mt-4 border-top border-secondary pt-3">
+                <div class="px-3 py-2 text-muted small">
+                    <i class="fas fa-user me-2"></i>{{ Auth::user()->name ?? 'Usuario' }}
+                </div>
+            </li>
+            <li class="nav-item">
+                <form action="{{ route('logout') }}" method="POST" class="d-inline w-100">
+                    @csrf
+                    <button type="submit" class="nav-link text-danger border-0 bg-transparent w-100 text-start">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                    </button>
+                </form>
+            </li>
         </ul>
     </nav>
 

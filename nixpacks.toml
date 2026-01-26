@@ -8,4 +8,4 @@ cmds = ["composer install --no-dev --optimize-autoloader --no-scripts"]
 cmds = []
 
 [start]
-cmd = "php artisan migrate --force && cd public && php -S 0.0.0.0:${PORT:-8080} ../server.php"
+cmd = "php artisan migrate --force && php artisan db:seed --force && cd public && php -S 0.0.0.0:${PORT:-8080} ../server.php"
