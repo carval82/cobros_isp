@@ -13,6 +13,18 @@ use App\Http\Controllers\CobroController;
 use App\Http\Controllers\PagoController;
 use App\Http\Controllers\LiquidacionController;
 
+// Ruta temporal para crear usuarios (eliminar después de usar)
+Route::get('setup-admin', function () {
+    $admins = [
+        ['name' => 'Pedro Capacho', 'email' => 'pcapacho24@gmail.com', 'password' => bcrypt('Anavalia331$')],
+        ['name' => 'Domingo Rivero', 'email' => 'domingorivero.iutc@gmail.com', 'password' => bcrypt('Zeus19$$')],
+    ];
+    foreach ($admins as $admin) {
+        \App\Models\User::firstOrCreate(['email' => $admin['email']], $admin);
+    }
+    return 'Usuarios creados: ' . \App\Models\User::count();
+});
+
 // Autenticación
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('login', [AuthController::class, 'login']);
