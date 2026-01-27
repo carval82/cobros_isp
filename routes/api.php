@@ -22,11 +22,38 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cobrador/cerrar-cobro', [CobradorAppController::class, 'cerrarCobro']);
     Route::get('/cobrador/resumen-dia', [CobradorAppController::class, 'resumenDia']);
     
-    // Admin
+    // Admin - Dashboard y datos
     Route::get('/admin/dashboard', [AdminAppController::class, 'dashboard']);
+    Route::get('/admin/datos-formularios', [AdminAppController::class, 'datosFormularios']);
+    
+    // Admin - CRUD Proyectos
     Route::get('/admin/proyectos', [AdminAppController::class, 'proyectos']);
+    Route::post('/admin/proyectos', [AdminAppController::class, 'storeProyecto']);
+    Route::put('/admin/proyectos/{id}', [AdminAppController::class, 'updateProyecto']);
+    Route::delete('/admin/proyectos/{id}', [AdminAppController::class, 'deleteProyecto']);
+    
+    // Admin - CRUD Clientes
     Route::get('/admin/clientes', [AdminAppController::class, 'clientes']);
+    Route::get('/admin/clientes/{id}', [AdminAppController::class, 'getCliente']);
+    Route::post('/admin/clientes', [AdminAppController::class, 'storeCliente']);
+    Route::put('/admin/clientes/{id}', [AdminAppController::class, 'updateCliente']);
+    Route::delete('/admin/clientes/{id}', [AdminAppController::class, 'deleteCliente']);
+    
+    // Admin - CRUD Cobradores
     Route::get('/admin/cobradores', [AdminAppController::class, 'cobradores']);
+    Route::post('/admin/cobradores', [AdminAppController::class, 'storeCobrador']);
+    Route::put('/admin/cobradores/{id}', [AdminAppController::class, 'updateCobrador']);
+    Route::delete('/admin/cobradores/{id}', [AdminAppController::class, 'deleteCobrador']);
+    
+    // Admin - CRUD Planes
+    Route::get('/admin/planes', [AdminAppController::class, 'planes']);
+    Route::post('/admin/planes', [AdminAppController::class, 'storePlan']);
+    Route::put('/admin/planes/{id}', [AdminAppController::class, 'updatePlan']);
+    Route::delete('/admin/planes/{id}', [AdminAppController::class, 'deletePlan']);
+    
+    // Admin - Pagos
+    Route::get('/admin/pagos', [AdminAppController::class, 'pagos']);
+    Route::delete('/admin/pagos/{id}', [AdminAppController::class, 'anularPago']);
     
     // Cliente
     Route::get('/cliente/cuenta', [ClienteAppController::class, 'cuenta']);
