@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Sanctum\HasApiTokens;
 
 class Cliente extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasApiTokens;
 
     protected $fillable = [
         'proyecto_id',
@@ -31,6 +32,11 @@ class Cliente extends Model
         'fecha_instalacion',
         'notas',
         'cobrador_id',
+        'pin',
+    ];
+
+    protected $hidden = [
+        'pin',
     ];
 
     protected $casts = [
