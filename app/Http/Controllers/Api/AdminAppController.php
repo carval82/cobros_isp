@@ -468,6 +468,55 @@ class AdminAppController extends Controller
         ]);
     }
 
+    // ==================== FACTURAS ====================
+    
+    public function facturas(Request $request)
+    {
+        $query = Factura::with(['servicio.cliente.proyecto', 'servicio.planServicio']);
+        
+        if ($request->mes && $request->anio) {
+            $query->where('mes', $request->mes)->where('anio', $request->anio);
+        }
+        if ($request->estado) {
+            $query->where('estado', $request->estado);
+        }
+        if ($request->proyecto_id) {
+            $query->whereHas('servicio.cliente', function($q) use ($request) {
+                $q->where('proyecto_id', $request->proyecto_id);
+            });
+        }
+
+        $facturas = $query->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get()
+            ->map(fn($f) => [
+                'id' => $f->id,
+                'periodo' => $f->periodo,
+                'mes' => $f->mes,
+                'anio' => $f->anio,
+                'total' => $f->total,
+                'saldo' => $f->saldo,
+                'estado' => $f->estado,
+                'fecha_vencimiento' => $f->fecha_vencimiento?->format('Y-m-d'),
+                'cliente' => $f->servicio?->cliente?->nombre,
+                'cliente_id' => $f->servicio?->cliente?->id,
+                'proyecto' => $f->servicio?->cliente?->proyecto?->nombre,
+                'plan' => $f->servicio?->planServicio?->nombre,
+            ]);
+
+        $totales = [
+            'total_facturado' => $facturas->sum('total'),
+            'total_pendiente' => $facturas->sum('saldo'),
+            'total_pagado' => $facturas->sum('total') - $facturas->sum('saldo'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'facturas' => $facturas,
+            'totales' => $totales,
+        ]);
+    }
+
     // ==================== PAGOS ====================
     
     public function pagos(Request $request)
@@ -498,9 +547,12 @@ class AdminAppController extends Controller
                 'factura_periodo' => $p->factura?->periodo,
             ]);
 
+        $totalRecaudado = $pagos->sum('monto');
+
         return response()->json([
             'success' => true,
             'pagos' => $pagos,
+            'total_recaudado' => $totalRecaudado,
         ]);
     }
 

@@ -64,6 +64,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/admin/gastos/{id}', [AdminAppController::class, 'updateGasto']);
     Route::delete('/admin/gastos/{id}', [AdminAppController::class, 'deleteGasto']);
     
+    // Admin - Facturas
+    Route::get('/admin/facturas', [AdminAppController::class, 'facturas']);
+    
     // Admin - Pagos
     Route::get('/admin/pagos', [AdminAppController::class, 'pagos']);
     Route::delete('/admin/pagos/{id}', [AdminAppController::class, 'anularPago']);
