@@ -11,6 +11,7 @@ use App\Models\Factura;
 use App\Models\Pago;
 use App\Models\PlanServicio;
 use App\Models\Servicio;
+use App\Models\GastoProyecto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -620,6 +621,170 @@ class AdminAppController extends Controller
         ]);
     }
 
+    // ==================== CRUD GASTOS DE PROYECTO ====================
+    
+    public function gastosProyecto($proyectoId, Request $request)
+    {
+        $proyecto = Proyecto::findOrFail($proyectoId);
+        
+        $query = GastoProyecto::where('proyecto_id', $proyectoId);
+        
+        if ($request->mes && $request->anio) {
+            $query->whereMonth('fecha', $request->mes)
+                  ->whereYear('fecha', $request->anio);
+        }
+        
+        if ($request->categoria) {
+            $query->where('categoria', $request->categoria);
+        }
+
+        $gastos = $query->orderBy('fecha', 'desc')
+            ->get()
+            ->map(fn($g) => [
+                'id' => $g->id,
+                'categoria' => $g->categoria,
+                'categoria_nombre' => GastoProyecto::categorias()[$g->categoria] ?? $g->categoria,
+                'descripcion' => $g->descripcion,
+                'monto' => $g->monto,
+                'fecha' => $g->fecha->format('Y-m-d'),
+                'proveedor' => $g->proveedor,
+                'factura_numero' => $g->factura_numero,
+                'notas' => $g->notas,
+            ]);
+
+        $totalGastos = $gastos->sum('monto');
+
+        return response()->json([
+            'success' => true,
+            'proyecto' => [
+                'id' => $proyecto->id,
+                'nombre' => $proyecto->nombre,
+            ],
+            'gastos' => $gastos,
+            'total_gastos' => $totalGastos,
+            'categorias' => GastoProyecto::categorias(),
+        ]);
+    }
+
+    public function storeGasto(Request $request)
+    {
+        $request->validate([
+            'proyecto_id' => 'required|exists:proyectos,id',
+            'categoria' => 'required|string|max:50',
+            'descripcion' => 'required|string|max:255',
+            'monto' => 'required|numeric|min:0',
+            'fecha' => 'required|date',
+            'proveedor' => 'nullable|string|max:255',
+            'factura_numero' => 'nullable|string|max:50',
+            'notas' => 'nullable|string',
+        ]);
+
+        $gasto = GastoProyecto::create([
+            'proyecto_id' => $request->proyecto_id,
+            'categoria' => $request->categoria,
+            'descripcion' => $request->descripcion,
+            'monto' => $request->monto,
+            'fecha' => $request->fecha,
+            'proveedor' => $request->proveedor,
+            'factura_numero' => $request->factura_numero,
+            'notas' => $request->notas,
+            'registrado_por' => $request->user()?->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Gasto registrado exitosamente',
+            'gasto' => $gasto,
+        ]);
+    }
+
+    public function updateGasto(Request $request, $id)
+    {
+        $gasto = GastoProyecto::findOrFail($id);
+        
+        $request->validate([
+            'categoria' => 'sometimes|string|max:50',
+            'descripcion' => 'sometimes|string|max:255',
+            'monto' => 'sometimes|numeric|min:0',
+            'fecha' => 'sometimes|date',
+            'proveedor' => 'nullable|string|max:255',
+            'factura_numero' => 'nullable|string|max:50',
+            'notas' => 'nullable|string',
+        ]);
+
+        $gasto->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Gasto actualizado exitosamente',
+            'gasto' => $gasto,
+        ]);
+    }
+
+    public function deleteGasto($id)
+    {
+        $gasto = GastoProyecto::findOrFail($id);
+        $gasto->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Gasto eliminado exitosamente',
+        ]);
+    }
+
+    public function resumenProyecto($proyectoId, Request $request)
+    {
+        $proyecto = Proyecto::withCount(['clientes' => function($q) {
+            $q->where('estado', 'activo');
+        }])->findOrFail($proyectoId);
+        
+        $mes = $request->mes ?? now()->month;
+        $anio = $request->anio ?? now()->year;
+
+        // Ingresos del mes (pagos recibidos)
+        $ingresos = Pago::whereHas('factura.servicio.cliente', function($q) use ($proyectoId) {
+            $q->where('proyecto_id', $proyectoId);
+        })->whereMonth('fecha_pago', $mes)
+          ->whereYear('fecha_pago', $anio)
+          ->sum('monto');
+
+        // Gastos del mes
+        $gastos = GastoProyecto::where('proyecto_id', $proyectoId)
+            ->whereMonth('fecha', $mes)
+            ->whereYear('fecha', $anio)
+            ->sum('monto');
+
+        // Gastos por categoría
+        $gastosPorCategoria = GastoProyecto::where('proyecto_id', $proyectoId)
+            ->whereMonth('fecha', $mes)
+            ->whereYear('fecha', $anio)
+            ->selectRaw('categoria, SUM(monto) as total')
+            ->groupBy('categoria')
+            ->get()
+            ->mapWithKeys(fn($g) => [$g->categoria => $g->total]);
+
+        $utilidad = $ingresos - $gastos;
+
+        return response()->json([
+            'success' => true,
+            'proyecto' => [
+                'id' => $proyecto->id,
+                'nombre' => $proyecto->nombre,
+                'clientes_activos' => $proyecto->clientes_count,
+            ],
+            'periodo' => [
+                'mes' => $mes,
+                'anio' => $anio,
+            ],
+            'resumen' => [
+                'ingresos' => $ingresos,
+                'gastos' => $gastos,
+                'utilidad' => $utilidad,
+                'gastos_por_categoria' => $gastosPorCategoria,
+            ],
+        ]);
+    }
+
     // ==================== DATOS AUXILIARES ====================
     
     public function datosFormularios()
@@ -633,6 +798,7 @@ class AdminAppController extends Controller
             'proyectos' => $proyectos,
             'cobradores' => $cobradores,
             'planes' => $planes,
+            'categorias_gastos' => GastoProyecto::categorias(),
         ]);
     }
 }

@@ -57,6 +57,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/admin/servicios/{id}', [AdminAppController::class, 'updateServicio']);
     Route::delete('/admin/servicios/{id}', [AdminAppController::class, 'deleteServicio']);
     
+    // Admin - Gastos de Proyecto
+    Route::get('/admin/proyectos/{id}/gastos', [AdminAppController::class, 'gastosProyecto']);
+    Route::get('/admin/proyectos/{id}/resumen', [AdminAppController::class, 'resumenProyecto']);
+    Route::post('/admin/gastos', [AdminAppController::class, 'storeGasto']);
+    Route::put('/admin/gastos/{id}', [AdminAppController::class, 'updateGasto']);
+    Route::delete('/admin/gastos/{id}', [AdminAppController::class, 'deleteGasto']);
+    
     // Admin - Pagos
     Route::get('/admin/pagos', [AdminAppController::class, 'pagos']);
     Route::delete('/admin/pagos/{id}', [AdminAppController::class, 'anularPago']);
