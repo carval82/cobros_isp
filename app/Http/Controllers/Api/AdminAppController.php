@@ -523,6 +523,103 @@ class AdminAppController extends Controller
         ]);
     }
 
+    // ==================== CRUD SERVICIOS ====================
+    
+    public function serviciosCliente($clienteId)
+    {
+        $cliente = Cliente::with(['servicios.planServicio'])->findOrFail($clienteId);
+        
+        $servicios = $cliente->servicios->map(fn($s) => [
+            'id' => $s->id,
+            'plan_id' => $s->plan_servicio_id,
+            'plan_nombre' => $s->planServicio?->nombre,
+            'precio_plan' => $s->planServicio?->precio,
+            'precio_especial' => $s->precio_especial,
+            'precio_mensual' => $s->precio_mensual,
+            'ip_asignada' => $s->ip_asignada,
+            'mac_address' => $s->mac_address,
+            'dia_corte' => $s->dia_corte,
+            'dia_pago_limite' => $s->dia_pago_limite,
+            'fecha_inicio' => $s->fecha_inicio?->format('Y-m-d'),
+            'estado' => $s->estado,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'cliente' => [
+                'id' => $cliente->id,
+                'nombre' => $cliente->nombre,
+            ],
+            'servicios' => $servicios,
+        ]);
+    }
+
+    public function storeServicio(Request $request)
+    {
+        $request->validate([
+            'cliente_id' => 'required|exists:clientes,id',
+            'plan_servicio_id' => 'required|exists:plan_servicios,id',
+            'ip_asignada' => 'nullable|string|max:45',
+            'mac_address' => 'nullable|string|max:17',
+            'dia_corte' => 'nullable|integer|min:1|max:28',
+            'dia_pago_limite' => 'nullable|integer|min:1|max:28',
+            'precio_especial' => 'nullable|numeric|min:0',
+            'fecha_inicio' => 'nullable|date',
+        ]);
+
+        $servicio = Servicio::create([
+            'cliente_id' => $request->cliente_id,
+            'plan_servicio_id' => $request->plan_servicio_id,
+            'ip_asignada' => $request->ip_asignada,
+            'mac_address' => $request->mac_address,
+            'dia_corte' => $request->dia_corte ?? 1,
+            'dia_pago_limite' => $request->dia_pago_limite ?? 10,
+            'precio_especial' => $request->precio_especial,
+            'fecha_inicio' => $request->fecha_inicio ?? now(),
+            'estado' => 'activo',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Servicio asignado exitosamente',
+            'servicio' => $servicio,
+        ]);
+    }
+
+    public function updateServicio(Request $request, $id)
+    {
+        $servicio = Servicio::findOrFail($id);
+        
+        $request->validate([
+            'plan_servicio_id' => 'sometimes|exists:plan_servicios,id',
+            'ip_asignada' => 'nullable|string|max:45',
+            'mac_address' => 'nullable|string|max:17',
+            'dia_corte' => 'nullable|integer|min:1|max:28',
+            'dia_pago_limite' => 'nullable|integer|min:1|max:28',
+            'precio_especial' => 'nullable|numeric|min:0',
+            'estado' => 'sometimes|in:activo,suspendido,cancelado',
+        ]);
+
+        $servicio->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Servicio actualizado exitosamente',
+            'servicio' => $servicio,
+        ]);
+    }
+
+    public function deleteServicio($id)
+    {
+        $servicio = Servicio::findOrFail($id);
+        $servicio->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Servicio eliminado exitosamente',
+        ]);
+    }
+
     // ==================== DATOS AUXILIARES ====================
     
     public function datosFormularios()
