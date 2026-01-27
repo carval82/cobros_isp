@@ -48,6 +48,31 @@ class AdminAppController extends Controller
         ]);
     }
 
+    public function updatePerfil(Request $request)
+    {
+        $user = $request->user();
+        
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+        ]);
+
+        if ($request->has('name')) {
+            $user->name = $request->name;
+        }
+        
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Perfil actualizado',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+        ]);
+    }
+
     public function dashboard(Request $request)
     {
         $mes = now()->month;

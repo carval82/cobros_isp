@@ -79,4 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+    
+    // Actualizar perfil de usuario
+    Route::put('/admin/perfil', [AdminAppController::class, 'updatePerfil']);
 });
