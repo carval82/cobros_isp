@@ -71,6 +71,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/pagos', [AdminAppController::class, 'pagos']);
     Route::delete('/admin/pagos/{id}', [AdminAppController::class, 'anularPago']);
     
+    // Admin - Participaciones de Proyecto
+    Route::get('/admin/proyectos/{id}/participaciones', [AdminAppController::class, 'participacionesProyecto']);
+    Route::post('/admin/participaciones', [AdminAppController::class, 'storeParticipacion']);
+    Route::put('/admin/participaciones/{id}', [AdminAppController::class, 'updateParticipacion']);
+    Route::delete('/admin/participaciones/{id}', [AdminAppController::class, 'deleteParticipacion']);
+    
+    // Admin - Liquidación de Proyecto
+    Route::get('/admin/proyectos/{id}/liquidacion', [AdminAppController::class, 'liquidacionProyecto']);
+    
     // Cliente
     Route::get('/cliente/cuenta', [ClienteAppController::class, 'cuenta']);
     Route::get('/cliente/facturas', [ClienteAppController::class, 'facturas']);

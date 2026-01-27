@@ -12,6 +12,7 @@ use App\Models\Pago;
 use App\Models\PlanServicio;
 use App\Models\Servicio;
 use App\Models\GastoProyecto;
+use App\Models\ParticipacionProyecto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -859,6 +860,174 @@ class AdminAppController extends Controller
                 'utilidad' => $utilidad,
                 'gastos_por_categoria' => $gastosPorCategoria,
             ],
+        ]);
+    }
+
+    // ==================== PARTICIPACIONES ====================
+
+    public function participacionesProyecto($proyectoId)
+    {
+        $participaciones = ParticipacionProyecto::where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->orderBy('porcentaje', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'participaciones' => $participaciones,
+            'total_porcentaje' => $participaciones->sum('porcentaje'),
+        ]);
+    }
+
+    public function storeParticipacion(Request $request)
+    {
+        $request->validate([
+            'proyecto_id' => 'required|exists:proyectos,id',
+            'socio_nombre' => 'required|string|max:255',
+            'porcentaje' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $participacion = ParticipacionProyecto::create($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Participación creada',
+            'participacion' => $participacion,
+        ]);
+    }
+
+    public function updateParticipacion(Request $request, $id)
+    {
+        $participacion = ParticipacionProyecto::findOrFail($id);
+        $participacion->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Participación actualizada',
+            'participacion' => $participacion,
+        ]);
+    }
+
+    public function deleteParticipacion($id)
+    {
+        $participacion = ParticipacionProyecto::findOrFail($id);
+        $participacion->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Participación eliminada',
+        ]);
+    }
+
+    // ==================== LIQUIDACIÓN ====================
+
+    public function liquidacionProyecto(Request $request, $proyectoId)
+    {
+        $mes = $request->mes ?? now()->month;
+        $anio = $request->anio ?? now()->year;
+
+        $proyecto = Proyecto::findOrFail($proyectoId);
+
+        // Obtener participaciones
+        $participaciones = ParticipacionProyecto::where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->get();
+
+        // Calcular ingresos del mes (pagos recibidos)
+        $ingresos = Pago::whereHas('factura.servicio.cliente', function($q) use ($proyectoId) {
+            $q->where('proyecto_id', $proyectoId);
+        })
+        ->whereMonth('fecha_pago', $mes)
+        ->whereYear('fecha_pago', $anio)
+        ->get();
+
+        $totalIngresos = $ingresos->sum('monto');
+
+        // Calcular gastos del mes
+        $gastos = GastoProyecto::where('proyecto_id', $proyectoId)
+            ->whereMonth('fecha', $mes)
+            ->whereYear('fecha', $anio)
+            ->get();
+
+        $totalGastos = $gastos->sum('monto');
+
+        // Gastos por categoría
+        $gastosPorCategoria = $gastos->groupBy('categoria')->map(function($items, $categoria) {
+            return [
+                'categoria' => $categoria,
+                'nombre' => GastoProyecto::categorias()[$categoria] ?? $categoria,
+                'total' => $items->sum('monto'),
+                'items' => $items->map(fn($g) => [
+                    'descripcion' => $g->descripcion,
+                    'monto' => $g->monto,
+                    'fecha' => $g->fecha->format('Y-m-d'),
+                    'proveedor' => $g->proveedor,
+                ])->values(),
+            ];
+        })->values();
+
+        // Comisiones de cobradores
+        $comisionesCobradores = Cobrador::where('proyecto_id', $proyectoId)
+            ->where('estado', 'activo')
+            ->get()
+            ->map(function($cobrador) use ($mes, $anio) {
+                $recaudado = Pago::where('cobrador_id', $cobrador->id)
+                    ->whereMonth('fecha_pago', $mes)
+                    ->whereYear('fecha_pago', $anio)
+                    ->sum('monto');
+                
+                $comision = $recaudado * ($cobrador->comision_porcentaje / 100);
+                
+                return [
+                    'cobrador' => $cobrador->nombre,
+                    'recaudado' => $recaudado,
+                    'porcentaje_comision' => $cobrador->comision_porcentaje,
+                    'comision' => $comision,
+                ];
+            });
+
+        $totalComisiones = $comisionesCobradores->sum('comision');
+
+        // Utilidad neta (después de gastos y comisiones)
+        $utilidadBruta = $totalIngresos - $totalGastos;
+        $utilidadNeta = $utilidadBruta - $totalComisiones;
+
+        // Distribución por socio
+        $distribucionSocios = $participaciones->map(function($p) use ($utilidadNeta, $totalGastos, $totalComisiones) {
+            $porcentaje = $p->porcentaje / 100;
+            return [
+                'socio' => $p->socio_nombre,
+                'documento' => $p->socio_documento,
+                'telefono' => $p->socio_telefono,
+                'porcentaje' => $p->porcentaje,
+                'gastos_proporcional' => round($totalGastos * $porcentaje, 2),
+                'comisiones_proporcional' => round($totalComisiones * $porcentaje, 2),
+                'utilidad' => round($utilidadNeta * $porcentaje, 2),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'proyecto' => [
+                'id' => $proyecto->id,
+                'nombre' => $proyecto->nombre,
+                'codigo' => $proyecto->codigo,
+            ],
+            'periodo' => [
+                'mes' => $mes,
+                'anio' => $anio,
+                'nombre_mes' => Carbon::create($anio, $mes, 1)->locale('es')->monthName,
+            ],
+            'resumen' => [
+                'total_ingresos' => $totalIngresos,
+                'total_gastos' => $totalGastos,
+                'total_comisiones' => $totalComisiones,
+                'utilidad_bruta' => $utilidadBruta,
+                'utilidad_neta' => $utilidadNeta,
+            ],
+            'detalle_gastos' => $gastosPorCategoria,
+            'detalle_comisiones' => $comisionesCobradores,
+            'distribucion_socios' => $distribucionSocios,
         ]);
     }
 
