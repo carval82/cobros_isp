@@ -140,6 +140,9 @@ class CobradorAppController extends Controller
             ], 403);
         }
 
+        // Generar facturas del mes en curso para clientes con servicio activo
+        $this->generarFacturasMesActual($proyecto_id);
+
         $query = Cliente::with(['proyecto', 'servicios.planServicio'])
             ->where('proyecto_id', $proyecto_id)
             ->where('estado', 'activo');
@@ -149,6 +152,7 @@ class CobradorAppController extends Controller
         }
 
         $clientes = $query->get()->map(function($cliente) {
+            $servicio = $cliente->servicios->where('estado', 'activo')->first();
             return [
                 'id' => $cliente->id,
                 'codigo' => $cliente->codigo,
@@ -163,10 +167,12 @@ class CobradorAppController extends Controller
                 'longitud' => $cliente->longitud,
                 'proyecto_id' => $cliente->proyecto_id,
                 'proyecto_nombre' => $cliente->proyecto?->nombre,
-                'servicio' => $cliente->servicios->first() ? [
-                    'id' => $cliente->servicios->first()->id,
-                    'plan_nombre' => $cliente->servicios->first()->planServicio->nombre ?? 'Sin plan',
-                    'precio' => $cliente->servicios->first()->precio_mensual,
+                'servicio' => $servicio ? [
+                    'id' => $servicio->id,
+                    'plan_nombre' => $servicio->planServicio->nombre ?? 'Sin plan',
+                    'precio' => $servicio->precio_mensual,
+                    'dia_corte' => $servicio->dia_corte,
+                    'dia_pago_limite' => $servicio->dia_pago_limite,
                 ] : null,
                 'updated_at' => $cliente->updated_at->toISOString(),
             ];
@@ -174,9 +180,13 @@ class CobradorAppController extends Controller
 
         $facturasPendientes = Factura::with('cliente')
             ->whereHas('cliente', function($q) use ($proyecto_id) {
-                $q->where('proyecto_id', $proyecto_id);
+                $q->where('proyecto_id', $proyecto_id)
+                  ->where('estado', 'activo');
             })
             ->whereIn('estado', ['pendiente', 'parcial', 'vencida'])
+            ->orderBy('cliente_id')
+            ->orderBy('anio', 'desc')
+            ->orderBy('mes', 'desc')
             ->get()
             ->map(function($factura) {
                 return [
@@ -312,9 +322,14 @@ class CobradorAppController extends Controller
         ]);
 
         $cobrador = $request->user();
-        $factura = Factura::findOrFail($request->factura_id);
+        $factura = Factura::with('cliente')->findOrFail($request->factura_id);
 
-        if ($factura->cliente->cobrador_id !== $cobrador->id) {
+        // Verificar que el cobrador tiene acceso al proyecto del cliente
+        $proyecto_id = $factura->cliente->proyecto_id;
+        $tieneAcceso = $cobrador->proyectos()->where('proyectos.id', $proyecto_id)->exists() 
+            || $cobrador->proyecto_id == $proyecto_id;
+            
+        if (!$tieneAcceso) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permiso para cobrar esta factura'
@@ -522,5 +537,63 @@ class CobradorAppController extends Controller
                 ],
             ],
         ]);
+    }
+
+    private function generarFacturasMesActual($proyecto_id)
+    {
+        $mes = now()->month;
+        $anio = now()->year;
+        $diaActual = now()->day;
+
+        // Obtener clientes activos del proyecto con servicio activo
+        $clientes = Cliente::with(['servicios' => function($q) {
+                $q->where('estado', 'activo');
+            }])
+            ->where('proyecto_id', $proyecto_id)
+            ->where('estado', 'activo')
+            ->get();
+
+        foreach ($clientes as $cliente) {
+            $servicio = $cliente->servicios->first();
+            
+            if (!$servicio) continue;
+
+            // Verificar si ya existe factura para este mes
+            $facturaExiste = Factura::where('cliente_id', $cliente->id)
+                ->where('servicio_id', $servicio->id)
+                ->where('mes', $mes)
+                ->where('anio', $anio)
+                ->exists();
+
+            if ($facturaExiste) continue;
+
+            // Generar factura si el día actual es >= día de corte
+            if ($diaActual >= $servicio->dia_corte) {
+                $precio = $servicio->precio_mensual;
+                $diaVencimiento = $servicio->dia_pago_limite ?? 10;
+                
+                // Calcular fecha de vencimiento
+                $fechaVencimiento = Carbon::create($anio, $mes, min($diaVencimiento, 28));
+                if ($diaVencimiento > 28) {
+                    $fechaVencimiento = Carbon::create($anio, $mes, 1)->endOfMonth();
+                }
+
+                Factura::create([
+                    'cliente_id' => $cliente->id,
+                    'servicio_id' => $servicio->id,
+                    'mes' => $mes,
+                    'anio' => $anio,
+                    'fecha_emision' => now(),
+                    'fecha_vencimiento' => $fechaVencimiento,
+                    'subtotal' => $precio,
+                    'descuento' => 0,
+                    'recargo' => 0,
+                    'total' => $precio,
+                    'saldo' => $precio,
+                    'estado' => 'pendiente',
+                    'concepto' => 'Servicio de Internet - ' . ($servicio->planServicio->nombre ?? 'Plan'),
+                ]);
+            }
+        }
     }
 }
