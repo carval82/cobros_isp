@@ -10,12 +10,20 @@ use Illuminate\Support\Facades\Hash;
 
 class CobradorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $cobradores = Cobrador::with('proyecto')->withCount(['clientes', 'cobros'])
-            ->orderBy('nombre')
-            ->get();
-        return view('cobradores.index', compact('cobradores'));
+        $query = Cobrador::with('proyectos')->withCount(['clientes', 'cobros']);
+
+        if ($request->filled('proyecto_id')) {
+            $query->whereHas('proyectos', function($q) use ($request) {
+                $q->where('proyectos.id', $request->proyecto_id);
+            });
+        }
+
+        $cobradores = $query->orderBy('nombre')->get();
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        
+        return view('cobradores.index', compact('cobradores', 'proyectos'));
     }
 
     public function create()

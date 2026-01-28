@@ -12,6 +12,34 @@
     </a>
 </div>
 
+<!-- Filtro por Proyecto -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="GET" action="{{ route('cobradores.index') }}" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label class="col-form-label"><i class="fas fa-filter me-1"></i>Filtrar por Proyecto:</label>
+            </div>
+            <div class="col-auto">
+                <select name="proyecto_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">-- Todos los proyectos --</option>
+                    @foreach($proyectos as $proyecto)
+                        <option value="{{ $proyecto->id }}" {{ request('proyecto_id') == $proyecto->id ? 'selected' : '' }}>
+                            {{ $proyecto->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            @if(request('proyecto_id'))
+            <div class="col-auto">
+                <a href="{{ route('cobradores.index') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times"></i> Limpiar
+                </a>
+            </div>
+            @endif
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -19,6 +47,7 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
+                        <th>Proyectos</th>
                         <th>Contacto</th>
                         <th class="text-center">Comisión</th>
                         <th class="text-center">Clientes</th>
@@ -37,6 +66,15 @@
                             @if($cobrador->documento)
                                 <br><small class="text-muted">{{ $cobrador->documento }}</small>
                             @endif
+                        </td>
+                        <td>
+                            @forelse($cobrador->proyectos as $proyecto)
+                                <span class="badge" style="background-color: {{ $proyecto->color ?? '#6c757d' }}">
+                                    {{ $proyecto->nombre }}
+                                </span>
+                            @empty
+                                <span class="text-muted">-</span>
+                            @endforelse
                         </td>
                         <td>
                             @if($cobrador->celular)
@@ -70,7 +108,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
+                        <td colspan="8" class="text-center py-4 text-muted">
                             <i class="fas fa-user-tie fa-2x mb-2 d-block"></i>
                             No hay cobradores registrados
                         </td>
