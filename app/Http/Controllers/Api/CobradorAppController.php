@@ -337,7 +337,7 @@ class CobradorAppController extends Controller
         }
 
         if ($request->offline_id) {
-            $existente = Pago::where('referencia', 'OFFLINE-' . $request->offline_id)->first();
+            $existente = Pago::where('referencia_pago', 'OFFLINE-' . $request->offline_id)->first();
             if ($existente) {
                 return response()->json([
                     'success' => true,
@@ -362,21 +362,12 @@ class CobradorAppController extends Controller
                 'monto' => $request->monto,
                 'fecha_pago' => $request->fecha_pago,
                 'metodo_pago' => $request->metodo_pago,
-                'observaciones' => $request->observaciones,
-                'referencia' => $request->offline_id ? 'OFFLINE-' . $request->offline_id : null,
+                'notas' => $request->observaciones,
+                'referencia_pago' => $request->offline_id ? 'OFFLINE-' . $request->offline_id : null,
             ]);
 
-            $factura->saldo -= $request->monto;
-            if ($factura->saldo <= 0) {
-                $factura->saldo = 0;
-                $factura->estado = 'pagada';
-            } else {
-                $factura->estado = 'parcial';
-            }
-            $factura->save();
-
-            $cobroAbierto->total_recaudado += $request->monto;
-            $cobroAbierto->save();
+            // Recargar la factura para obtener el saldo actualizado (el modelo Pago ya actualiza el saldo en el evento created)
+            $factura->refresh();
 
             DB::commit();
 
