@@ -212,6 +212,18 @@ class CobradorAppController extends Controller
             })
             ->get(['id', 'nombre', 'velocidad_bajada', 'velocidad_subida', 'precio']);
 
+        // Estadísticas de cobros del día para este cobrador
+        $hoy = Carbon::today();
+        $cobrosHoy = Pago::where('cobrador_id', $cobrador->id)
+            ->whereDate('fecha_pago', $hoy)
+            ->get();
+        
+        $resumenDia = [
+            'cobros_count' => $cobrosHoy->count(),
+            'total_cobrado' => $cobrosHoy->sum('monto'),
+            'fecha' => $hoy->format('Y-m-d'),
+        ];
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -219,6 +231,7 @@ class CobradorAppController extends Controller
                 'clientes' => $clientes,
                 'facturas_pendientes' => $facturasPendientes,
                 'planes' => $planes,
+                'resumen_dia' => $resumenDia,
                 'server_time' => now()->toISOString(),
             ]
         ]);
