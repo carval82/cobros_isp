@@ -73,16 +73,14 @@ class CobradorAppController extends Controller
         
         // Obtener proyectos de la tabla pivot
         $proyectos = $cobrador->proyectos()
-            ->withCount('clientes')
+            ->withCount(['clientes' => function($q) {
+                $q->where('estado', 'activo');
+            }])
             ->get()
             ->map(function($proyecto) use ($cobrador) {
-                $clientesCobrador = Cliente::where('proyecto_id', $proyecto->id)
-                    ->where('cobrador_id', $cobrador->id)
-                    ->count();
-                    
-                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto, $cobrador) {
+                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto) {
                     $q->where('proyecto_id', $proyecto->id)
-                      ->where('cobrador_id', $cobrador->id);
+                      ->where('estado', 'activo');
                 })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count();
                 
                 return [
@@ -91,22 +89,21 @@ class CobradorAppController extends Controller
                     'color' => $proyecto->color,
                     'ubicacion' => $proyecto->ubicacion,
                     'comision_porcentaje' => $proyecto->pivot->comision_porcentaje ?? $cobrador->comision_porcentaje,
-                    'clientes_asignados' => $clientesCobrador,
+                    'clientes_asignados' => $proyecto->clientes_count,
                     'facturas_pendientes' => $facturasPendientes,
                 ];
             });
         
         // Si no tiene proyectos en pivot, usar proyecto_id directo
         if ($proyectos->isEmpty() && $cobrador->proyecto_id) {
-            $proyecto = \App\Models\Proyecto::find($cobrador->proyecto_id);
+            $proyecto = \App\Models\Proyecto::withCount(['clientes' => function($q) {
+                $q->where('estado', 'activo');
+            }])->find($cobrador->proyecto_id);
+            
             if ($proyecto) {
-                $clientesCobrador = Cliente::where('proyecto_id', $proyecto->id)
-                    ->where('cobrador_id', $cobrador->id)
-                    ->count();
-                    
-                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto, $cobrador) {
+                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto) {
                     $q->where('proyecto_id', $proyecto->id)
-                      ->where('cobrador_id', $cobrador->id);
+                      ->where('estado', 'activo');
                 })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count();
                 
                 $proyectos = collect([[
@@ -115,7 +112,7 @@ class CobradorAppController extends Controller
                     'color' => $proyecto->color,
                     'ubicacion' => $proyecto->ubicacion,
                     'comision_porcentaje' => $cobrador->comision_porcentaje,
-                    'clientes_asignados' => $clientesCobrador,
+                    'clientes_asignados' => $proyecto->clientes_count,
                     'facturas_pendientes' => $facturasPendientes,
                 ]]);
             }
@@ -145,7 +142,6 @@ class CobradorAppController extends Controller
 
         $query = Cliente::with(['proyecto', 'servicios.planServicio'])
             ->where('proyecto_id', $proyecto_id)
-            ->where('cobrador_id', $cobrador->id)
             ->where('estado', 'activo');
 
         if ($lastSync) {
@@ -177,9 +173,8 @@ class CobradorAppController extends Controller
         });
 
         $facturasPendientes = Factura::with('cliente')
-            ->whereHas('cliente', function($q) use ($cobrador, $proyecto_id) {
-                $q->where('cobrador_id', $cobrador->id)
-                  ->where('proyecto_id', $proyecto_id);
+            ->whereHas('cliente', function($q) use ($proyecto_id) {
+                $q->where('proyecto_id', $proyecto_id);
             })
             ->whereIn('estado', ['pendiente', 'parcial', 'vencida'])
             ->get()
