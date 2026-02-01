@@ -65,6 +65,11 @@ class Cliente extends Model
         return $this->hasMany(Factura::class);
     }
 
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
     public function servicioActivo()
     {
         return $this->servicios()->where('estado', 'activo')->first();

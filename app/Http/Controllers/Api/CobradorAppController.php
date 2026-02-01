@@ -349,6 +349,7 @@ class CobradorAppController extends Controller
             ], 403);
         }
 
+        // Validar pago duplicado por offline_id
         if ($request->offline_id) {
             $existente = Pago::where('referencia_pago', 'OFFLINE-' . $request->offline_id)->first();
             if ($existente) {
@@ -359,6 +360,37 @@ class CobradorAppController extends Controller
                     'duplicado' => true,
                 ]);
             }
+        }
+
+        // Validar pago duplicado: mismo cobrador, misma factura, mismo monto, mismo día
+        $pagoDuplicado = Pago::where('factura_id', $factura->id)
+            ->where('cobrador_id', $cobrador->id)
+            ->where('monto', $request->monto)
+            ->whereDate('fecha_pago', $request->fecha_pago)
+            ->first();
+        
+        if ($pagoDuplicado) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pago ya registrado anteriormente',
+                'pago' => [
+                    'id' => $pagoDuplicado->id,
+                    'monto' => $pagoDuplicado->monto,
+                    'factura_id' => $pagoDuplicado->factura_id,
+                    'factura_saldo' => $factura->saldo,
+                    'factura_estado' => $factura->estado,
+                ],
+                'duplicado' => true,
+            ]);
+        }
+
+        // Validar que la factura tenga saldo pendiente
+        if ($factura->saldo <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta factura ya está pagada completamente',
+                'factura_estado' => $factura->estado,
+            ], 400);
         }
 
         $cobroAbierto = Cobro::firstOrCreate(
