@@ -81,9 +81,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/proyectos/{id}/liquidacion', [AdminAppController::class, 'liquidacionProyecto']);
     
     // Cliente
+    Route::post('/cliente/logout', [ClienteAppController::class, 'logout']);
     Route::get('/cliente/cuenta', [ClienteAppController::class, 'cuenta']);
-    Route::get('/cliente/facturas', [ClienteAppController::class, 'facturas']);
+    Route::get('/cliente/estado-cuenta', [ClienteAppController::class, 'estadoCuenta']);
+    Route::get('/cliente/facturas', [ClienteAppController::class, 'getFacturas']);
     Route::get('/cliente/pagos', [ClienteAppController::class, 'pagos']);
+    Route::get('/cliente/tickets', [ClienteAppController::class, 'getTickets']);
+    Route::post('/cliente/tickets', [ClienteAppController::class, 'crearTicket']);
+    Route::get('/cliente/perfil', [ClienteAppController::class, 'getPerfil']);
+    Route::put('/cliente/perfil', [ClienteAppController::class, 'actualizarPerfil']);
+    Route::put('/cliente/cambiar-pin', [ClienteAppController::class, 'cambiarPin']);
     
     Route::get('/user', function (Request $request) {
         return $request->user();
