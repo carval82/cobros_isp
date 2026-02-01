@@ -13,6 +13,7 @@ use App\Models\PlanServicio;
 use App\Models\Servicio;
 use App\Models\GastoProyecto;
 use App\Models\ParticipacionProyecto;
+use App\Models\Ticket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +93,12 @@ class AdminAppController extends Controller
 
         $pagosHoy = Pago::whereDate('fecha_pago', today())->get();
 
+        // Tickets pendientes
+        $ticketsPendientes = Ticket::whereIn('estado', ['abierto', 'en_proceso'])->count();
+        $ticketsNuevos = Ticket::where('estado', 'abierto')
+            ->where('created_at', '>=', now()->subHours(24))
+            ->count();
+
         return response()->json([
             'success' => true,
             'dashboard' => [
@@ -105,6 +112,8 @@ class AdminAppController extends Controller
                     'cantidad' => $pagosHoy->count(),
                     'total' => $pagosHoy->sum('monto'),
                 ],
+                'tickets_pendientes' => $ticketsPendientes,
+                'tickets_nuevos' => $ticketsNuevos,
             ],
         ]);
     }
@@ -1028,6 +1037,73 @@ class AdminAppController extends Controller
             'detalle_gastos' => $gastosPorCategoria,
             'detalle_comisiones' => $comisionesCobradores,
             'distribucion_socios' => $distribucionSocios,
+        ]);
+    }
+
+    // ==================== TICKETS ====================
+
+    public function tickets(Request $request)
+    {
+        $query = Ticket::with(['cliente', 'proyecto']);
+
+        if ($request->estado) {
+            $query->where('estado', $request->estado);
+        }
+
+        if ($request->proyecto_id) {
+            $query->where('proyecto_id', $request->proyecto_id);
+        }
+
+        $tickets = $query->orderByRaw("FIELD(estado, 'abierto', 'en_proceso', 'resuelto', 'cerrado')")
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get()
+            ->map(function($t) {
+                return [
+                    'id' => $t->id,
+                    'tipo' => $t->tipo,
+                    'asunto' => $t->asunto,
+                    'descripcion' => $t->descripcion,
+                    'estado' => $t->estado,
+                    'prioridad' => $t->prioridad,
+                    'cliente' => $t->cliente ? [
+                        'id' => $t->cliente->id,
+                        'nombre' => $t->cliente->nombre,
+                        'documento' => $t->cliente->documento,
+                    ] : null,
+                    'proyecto' => $t->proyecto ? [
+                        'id' => $t->proyecto->id,
+                        'nombre' => $t->proyecto->nombre,
+                    ] : null,
+                    'created_at' => $t->created_at->format('Y-m-d H:i'),
+                    'respuesta' => $t->respuesta,
+                    'fecha_respuesta' => $t->fecha_respuesta?->format('Y-m-d H:i'),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'tickets' => $tickets,
+        ]);
+    }
+
+    public function responderTicket(Request $request, $id)
+    {
+        $request->validate([
+            'respuesta' => 'required|string',
+            'estado' => 'required|in:en_proceso,resuelto,cerrado',
+        ]);
+
+        $ticket = Ticket::findOrFail($id);
+        $ticket->respuesta = $request->respuesta;
+        $ticket->estado = $request->estado;
+        $ticket->atendido_por = $request->user()->id;
+        $ticket->fecha_respuesta = now();
+        $ticket->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ticket actualizado correctamente',
         ]);
     }
 

@@ -5,11 +5,17 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\CobradorAppController;
 use App\Http\Controllers\Api\AdminAppController;
 use App\Http\Controllers\Api\ClienteAppController;
+use App\Http\Controllers\Api\SocioAppController;
 
 // Rutas públicas - Login
 Route::post('/cobrador/login', [CobradorAppController::class, 'login']);
 Route::post('/admin/login', [AdminAppController::class, 'login']);
 Route::post('/cliente/login', [ClienteAppController::class, 'login']);
+Route::post('/socio/login', [SocioAppController::class, 'login']);
+
+// Rutas de Socio (con token propio)
+Route::get('/socio/proyectos', [SocioAppController::class, 'proyectos']);
+Route::get('/socio/liquidacion/{proyecto_id}', [SocioAppController::class, 'liquidacion']);
 
 // Rutas protegidas (requieren token)
 Route::middleware('auth:sanctum')->group(function () {
@@ -79,6 +85,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Admin - Liquidación de Proyecto
     Route::get('/admin/proyectos/{id}/liquidacion', [AdminAppController::class, 'liquidacionProyecto']);
+    
+    // Admin - Tickets
+    Route::get('/admin/tickets', [AdminAppController::class, 'tickets']);
+    Route::put('/admin/tickets/{id}/responder', [AdminAppController::class, 'responderTicket']);
     
     // Cliente
     Route::post('/cliente/logout', [ClienteAppController::class, 'logout']);
