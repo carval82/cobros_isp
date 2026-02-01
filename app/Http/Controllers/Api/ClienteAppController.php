@@ -19,8 +19,13 @@ class ClienteAppController extends Controller
             'pin' => 'required|string|min:4|max:4',
         ]);
 
-        $cliente = Cliente::where('documento', $request->documento)
-            ->where('estado', 'activo')
+        $documento = $request->documento;
+        $cliente = Cliente::where('estado', 'activo')
+            ->where(function($q) use ($documento) {
+                $q->where('documento', $documento)
+                  ->orWhere('documento', 'CC ' . $documento)
+                  ->orWhere('documento', 'LIKE', '%' . $documento);
+            })
             ->first();
 
         if (!$cliente) {
