@@ -7,6 +7,7 @@ use App\Models\Cliente;
 use App\Models\Factura;
 use App\Models\Pago;
 use App\Models\Ticket;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -284,6 +285,21 @@ class ClienteAppController extends Controller
             'estado' => 'abierto',
             'prioridad' => $request->tipo === 'daño' ? 'alta' : 'media',
         ]);
+
+        // Enviar notificación push a admins
+        try {
+            $pushService = new PushNotificationService();
+            $pushService->sendToAdmins(
+                '🎫 Nuevo Ticket: ' . $request->tipo,
+                $cliente->nombre . ': ' . $request->asunto,
+                [
+                    'screen' => 'AdminTickets',
+                    'ticket_id' => $ticket->id,
+                ]
+            );
+        } catch (\Exception $e) {
+            \Log::error('Error enviando push notification: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CobradorAppController;
 use App\Http\Controllers\Api\AdminAppController;
 use App\Http\Controllers\Api\ClienteAppController;
 use App\Http\Controllers\Api\SocioAppController;
+use App\Http\Controllers\Api\PushTokenController;
 
 // Rutas públicas - Login
 Route::post('/cobrador/login', [CobradorAppController::class, 'login']);
@@ -89,6 +90,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin - Tickets
     Route::get('/admin/tickets', [AdminAppController::class, 'tickets']);
     Route::put('/admin/tickets/{id}/responder', [AdminAppController::class, 'responderTicket']);
+    
+    // Push Notifications
+    Route::post('/push-token', [PushTokenController::class, 'store']);
+    Route::delete('/push-token', [PushTokenController::class, 'destroy']);
     
     // Cliente
     Route::post('/cliente/logout', [ClienteAppController::class, 'logout']);
