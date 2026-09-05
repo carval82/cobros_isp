@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function () {
     Route::post('cobros/{cobro}/cerrar', [CobroController::class, 'cerrar'])->name('cobros.cerrar');
     Route::post('facturas/generar-mes', [FacturaController::class, 'generarMes'])->name('facturas.generar-mes');
     Route::post('facturas/generar-mes-proyecto', [FacturaController::class, 'generarMesProyecto'])->name('facturas.generar-mes-proyecto');
+    Route::post('facturas/reset-septiembre', [FacturaController::class, 'resetSeptiembre'])->name('facturas.reset-septiembre');
     Route::get('facturas/{factura}/pdf', [FacturaController::class, 'pdf'])->name('facturas.pdf');
     Route::get('facturas/{factura}/descargar-pdf', [FacturaController::class, 'descargarPdf'])->name('facturas.descargar-pdf');
     Route::post('liquidaciones/{liquidacion}/pagar', [LiquidacionController::class, 'pagar'])->name('liquidaciones.pagar');

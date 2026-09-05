@@ -14,6 +14,9 @@
         <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalGenerarMes">
             <i class="fas fa-calendar-plus me-1"></i>Generar Mes
         </button>
+        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalResetSeptiembre">
+            <i class="fas fa-broom me-1"></i>Solo septiembre
+        </button>
     </div>
 </div>
 
@@ -176,6 +179,34 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-check me-1"></i>Generar Facturas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalResetSeptiembre" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('facturas.reset-septiembre') }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-broom me-2"></i>Limpiar y cargar septiembre</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Esto deja los estados de cuenta solo con septiembre {{ now()->year }}:</p>
+                    <ul class="mb-0">
+                        <li>Oculta todas las facturas anteriores (enero, marzo, etc.).</li>
+                        <li>Genera una factura nueva por cada servicio activo.</li>
+                        <li>Los pagos históricos se conservan.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-check me-1"></i>Limpiar y generar septiembre
                     </button>
                 </div>
             </form>

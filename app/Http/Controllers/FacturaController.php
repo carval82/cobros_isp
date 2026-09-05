@@ -242,4 +242,60 @@ class FacturaController extends Controller
         return redirect()->route('facturas.index', ['mes' => $validated['mes'], 'anio' => $validated['anio']])
             ->with('success', "{$proyectoNombre}: Se generaron {$generadas} facturas. {$omitidas} omitidas.");
     }
+
+    public function resetSeptiembre()
+    {
+        $mes = 9;
+        $anio = (int) now()->year;
+
+        $eliminadas = Factura::query()->count();
+        Factura::query()->delete();
+
+        $resultado = $this->generarFacturasActivas($mes, $anio);
+
+        return redirect()->route('facturas.index', ['mes' => $mes, 'anio' => $anio])
+            ->with('success', "Estados de cuenta limpios: se ocultaron {$eliminadas} facturas anteriores y se cargaron {$resultado['generadas']} de septiembre {$anio}.");
+    }
+
+    private function generarFacturasActivas(int $mes, int $anio, ?int $proyectoId = null): array
+    {
+        $query = Servicio::with(['cliente', 'planServicio'])
+            ->where('estado', 'activo');
+
+        if ($proyectoId) {
+            $query->whereHas('cliente', function ($q) use ($proyectoId) {
+                $q->where('proyecto_id', $proyectoId);
+            });
+        }
+
+        $generadas = 0;
+        $omitidas = 0;
+
+        foreach ($query->get() as $servicio) {
+            if ($servicio->tieneFacturaMes($mes, $anio)) {
+                $omitidas++;
+                continue;
+            }
+
+            $precio = $servicio->precio_mensual;
+            $diaLimite = min((int) ($servicio->dia_pago_limite ?: 10), Carbon::create($anio, $mes, 1)->daysInMonth);
+
+            Factura::create([
+                'cliente_id' => $servicio->cliente_id,
+                'servicio_id' => $servicio->id,
+                'mes' => $mes,
+                'anio' => $anio,
+                'fecha_emision' => Carbon::create($anio, $mes, 1),
+                'fecha_vencimiento' => Carbon::create($anio, $mes, $diaLimite),
+                'subtotal' => $precio,
+                'total' => $precio,
+                'saldo' => $precio,
+                'concepto' => 'Servicio de Internet - ' . ($servicio->planServicio->nombre ?? 'Plan'),
+            ]);
+
+            $generadas++;
+        }
+
+        return compact('generadas', 'omitidas');
+    }
 }

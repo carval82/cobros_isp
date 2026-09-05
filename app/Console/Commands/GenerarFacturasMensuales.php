@@ -13,7 +13,8 @@ class GenerarFacturasMensuales extends Command
     protected $signature = 'facturas:generar 
         {--mes= : Mes a facturar (default: mes actual)}
         {--anio= : Año a facturar (default: año actual)}
-        {--proyecto= : ID del proyecto (opcional)}';
+        {--proyecto= : ID del proyecto (opcional)}
+        {--limpiar : Oculta las facturas anteriores antes de generar}';
 
     protected $description = 'Genera facturas mensuales automáticamente para todos los servicios activos';
 
@@ -22,6 +23,12 @@ class GenerarFacturasMensuales extends Command
         $mes = $this->option('mes') ?? now()->month;
         $anio = $this->option('anio') ?? now()->year;
         $proyectoId = $this->option('proyecto');
+
+        if ($this->option('limpiar')) {
+            $ocultas = Factura::query()->count();
+            Factura::query()->delete();
+            $this->warn("Estados de cuenta limpios: {$ocultas} facturas anteriores ocultadas.");
+        }
 
         $this->info("Generando facturas para {$mes}/{$anio}...");
 
