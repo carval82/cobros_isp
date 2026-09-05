@@ -6,6 +6,7 @@ use App\Models\Pago;
 use App\Models\Factura;
 use App\Models\Cobrador;
 use App\Models\Cobro;
+use App\Models\Liquidacion;
 use Illuminate\Http\Request;
 
 class PagoController extends Controller
@@ -110,6 +111,20 @@ class PagoController extends Controller
 
         return redirect()->route('pagos.index')
             ->with('success', 'Pago eliminado y saldo restaurado');
+    }
+
+    public function limpiarHistorial()
+    {
+        $pagos = Pago::withTrashed()->count();
+        $cobros = Cobro::count();
+        $liquidaciones = Liquidacion::count();
+
+        Pago::withTrashed()->forceDelete();
+        Cobro::query()->delete();
+        Liquidacion::query()->delete();
+
+        return redirect()->route('pagos.index')
+            ->with('success', "Mes en cero: se borraron {$pagos} pagos, {$cobros} cobros y {$liquidaciones} liquidaciones. Las facturas de septiembre siguen.");
     }
 
     public function apiStore(Request $request)

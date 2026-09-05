@@ -7,9 +7,14 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-money-bill-wave me-2"></i>Pagos
     </h1>
-    <a href="{{ route('pagos.create') }}" class="btn btn-primary">
-        <i class="fas fa-plus me-1"></i>Nuevo Pago
-    </a>
+    <div class="btn-group">
+        <a href="{{ route('pagos.create') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Nuevo Pago
+        </a>
+        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalLimpiarPagos">
+            <i class="fas fa-trash me-1"></i>Borrar pagos viejos
+        </button>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -70,5 +75,33 @@
         </div>
     </div>
     @if($pagos->hasPages())<div class="card-footer">{{ $pagos->withQueryString()->links() }}</div>@endif
+</div>
+
+<div class="modal fade" id="modalLimpiarPagos" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('pagos.limpiar-historial') }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-trash me-2"></i>Empezar el mes en cero</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Esto borra el historial de cartera anterior a septiembre:</p>
+                    <ul class="mb-0">
+                        <li>Elimina todos los pagos y recibos viejos.</li>
+                        <li>Elimina cobros y liquidaciones anteriores.</li>
+                        <li>Las facturas de septiembre se conservan.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-check me-1"></i>Borrar pagos viejos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 @endsection
