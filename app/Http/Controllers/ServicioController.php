@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Servicio;
 use App\Models\Cliente;
 use App\Models\PlanServicio;
+use App\Services\FacturacionService;
 use Illuminate\Http\Request;
 
 class ServicioController extends Controller
@@ -52,10 +53,19 @@ class ServicioController extends Controller
             'notas' => 'nullable|string',
         ]);
 
-        Servicio::create($validated);
+        $servicio = Servicio::create($validated);
+        $cliente = Cliente::find($validated['cliente_id']);
+        $factura = app(FacturacionService::class)->generarFacturaSiCorrespondeAlAlta($cliente, $servicio->fresh(['planServicio', 'cliente']));
+
+        $mensaje = 'Servicio creado correctamente';
+        if ($factura) {
+            $mensaje .= ' y se generó la factura del mes en curso';
+        } elseif ($cliente->esNuevo()) {
+            $mensaje .= '. Cliente nuevo: primera factura en ' . $cliente->etiquetaPrimeraFactura();
+        }
 
         return redirect()->route('clientes.show', $validated['cliente_id'])
-            ->with('success', 'Servicio creado correctamente');
+            ->with('success', $mensaje);
     }
 
     public function show(Servicio $servicio)

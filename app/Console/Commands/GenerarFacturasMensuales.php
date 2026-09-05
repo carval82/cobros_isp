@@ -57,6 +57,12 @@ class GenerarFacturasMensuales extends Command
         $bar->start();
 
         foreach ($servicios as $servicio) {
+            if ($servicio->cliente && ! $servicio->cliente->puedeFacturarseEn((int) $mes, (int) $anio)) {
+                $omitidas++;
+                $bar->advance();
+                continue;
+            }
+
             if ($servicio->tieneFacturaMes($mes, $anio)) {
                 $omitidas++;
                 $bar->advance();

@@ -29,6 +29,9 @@ class Cliente extends Authenticatable
         'longitud',
         'referencia_ubicacion',
         'estado',
+        'tipo_alta',
+        'primer_mes_facturable',
+        'primer_anio_facturable',
         'fecha_instalacion',
         'notas',
         'cobrador_id',
@@ -43,6 +46,8 @@ class Cliente extends Authenticatable
         'fecha_instalacion' => 'date',
         'latitud' => 'decimal:8',
         'longitud' => 'decimal:8',
+        'primer_mes_facturable' => 'integer',
+        'primer_anio_facturable' => 'integer',
     ];
 
     public function proyecto(): BelongsTo
@@ -78,6 +83,41 @@ class Cliente extends Authenticatable
     public function saldoPendiente(): float
     {
         return $this->facturas()->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->sum('saldo');
+    }
+
+    public function esNuevo(): bool
+    {
+        return $this->tipo_alta === 'nuevo';
+    }
+
+    public function puedeFacturarseEn(int $mes, int $anio): bool
+    {
+        if (! $this->primer_anio_facturable || ! $this->primer_mes_facturable) {
+            return true;
+        }
+
+        if ($anio > $this->primer_anio_facturable) {
+            return true;
+        }
+
+        if ($anio < $this->primer_anio_facturable) {
+            return false;
+        }
+
+        return $mes >= $this->primer_mes_facturable;
+    }
+
+    public function etiquetaPrimeraFactura(): ?string
+    {
+        if (! $this->primer_mes_facturable || ! $this->primer_anio_facturable) {
+            return null;
+        }
+
+        $meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        return ($meses[$this->primer_mes_facturable] ?? $this->primer_mes_facturable)
+            . ' ' . $this->primer_anio_facturable;
     }
 
     protected static function boot()

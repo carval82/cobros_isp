@@ -441,15 +441,17 @@ class CobradorAppController extends Controller
         $request->validate([
             'nombre' => 'required|string|max:150',
             'documento' => 'nullable|string|max:20',
-            'tipo_documento' => 'required|string|max:10',
+            'tipo_documento' => 'nullable|string|max:10',
             'celular' => 'nullable|string|max:20',
-            'direccion' => 'required|string|max:255',
+            'direccion' => 'nullable|string|max:255',
             'barrio' => 'nullable|string|max:100',
             'referencia_ubicacion' => 'nullable|string',
             'latitud' => 'nullable|numeric',
             'longitud' => 'nullable|numeric',
             'proyecto_id' => 'nullable|exists:proyectos,id',
             'plan_servicio_id' => 'nullable|exists:plan_servicios,id',
+            'plan_id' => 'nullable|exists:plan_servicios,id',
+            'tipo_alta' => 'nullable|in:nuevo,antiguo',
             'offline_id' => 'nullable|string',
         ]);
 
@@ -473,9 +475,9 @@ class CobradorAppController extends Controller
                 'proyecto_id' => $request->proyecto_id ?? $cobrador->proyecto_id,
                 'nombre' => $request->nombre,
                 'documento' => $request->documento,
-                'tipo_documento' => $request->tipo_documento,
+                'tipo_documento' => $request->tipo_documento ?: 'CC',
                 'celular' => $request->celular,
-                'direccion' => $request->direccion,
+                'direccion' => $request->direccion ?: 'Por definir',
                 'barrio' => $request->barrio,
                 'referencia_ubicacion' => $request->referencia_ubicacion,
                 'latitud' => $request->latitud,
@@ -485,27 +487,35 @@ class CobradorAppController extends Controller
                 'notas' => $request->offline_id ? 'OFFLINE-' . $request->offline_id : null,
             ]);
 
-            if ($request->plan_servicio_id) {
-                $plan = PlanServicio::find($request->plan_servicio_id);
-                Servicio::create([
-                    'cliente_id' => $cliente->id,
-                    'plan_servicio_id' => $plan->id,
-                    'fecha_inicio' => now(),
-                    'dia_corte' => 1,
-                    'dia_pago_limite' => 10,
-                    'estado' => 'activo',
-                ]);
+            $facturacion = app(\App\Services\FacturacionService::class);
+            $tipoAlta = $request->tipo_alta ?: 'nuevo';
+            $facturacion->aplicarPeriodoAlta($cliente, $tipoAlta);
+
+            $planId = $request->plan_servicio_id ?: $request->plan_id;
+            if ($planId) {
+                $facturacion->asignarServicioYFacturar($cliente, (int) $planId);
             }
 
             DB::commit();
 
+            $cliente->refresh();
+            if ($tipoAlta === 'antiguo') {
+                $mensaje = $planId
+                    ? 'Cliente antiguo registrado. Se generó la factura del mes en curso.'
+                    : 'Cliente antiguo registrado. Al asignar un plan se genera la factura del mes en curso.';
+            } else {
+                $mensaje = 'Cliente nuevo registrado. Primera factura: ' . $cliente->etiquetaPrimeraFactura() . '. Este mes queda libre.';
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Cliente registrado correctamente',
+                'message' => $mensaje,
                 'cliente' => [
                     'id' => $cliente->id,
                     'codigo' => $cliente->codigo,
                     'nombre' => $cliente->nombre,
+                    'tipo_alta' => $cliente->tipo_alta,
+                    'primera_factura' => $cliente->etiquetaPrimeraFactura(),
                 ],
             ]);
         } catch (\Exception $e) {
@@ -593,6 +603,10 @@ class CobradorAppController extends Controller
             $servicio = $cliente->servicios->first();
             
             if (!$servicio) continue;
+
+            if (! $cliente->puedeFacturarseEn($mes, $anio)) {
+                continue;
+            }
 
             // Verificar si ya existe factura para este mes
             $facturaExiste = Factura::where('cliente_id', $cliente->id)

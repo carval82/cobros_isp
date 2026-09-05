@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Cliente;
 use App\Models\Cobrador;
+use App\Models\PlanServicio;
 use App\Models\Proyecto;
+use App\Services\FacturacionService;
 use Illuminate\Http\Request;
 
 class ClienteController extends Controller
@@ -41,8 +43,21 @@ class ClienteController extends Controller
     {
         $cobradores = Cobrador::where('estado', 'activo')->orderBy('nombre')->get();
         $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        $planes = PlanServicio::where('activo', true)->orderBy('nombre')->get();
         $proyectoSeleccionado = $request->filled('proyecto_id') ? $request->proyecto_id : null;
-        return view('clientes.create', compact('cobradores', 'proyectos', 'proyectoSeleccionado'));
+        $facturacion = app(FacturacionService::class);
+        $periodoNuevo = $facturacion->calcularPrimerPeriodo('nuevo');
+        $periodoAntiguo = $facturacion->calcularPrimerPeriodo('antiguo');
+
+        return view('clientes.create', compact(
+            'cobradores',
+            'proyectos',
+            'planes',
+            'proyectoSeleccionado',
+            'periodoNuevo',
+            'periodoAntiguo',
+            'facturacion'
+        ));
     }
 
     public function store(Request $request)
@@ -63,12 +78,29 @@ class ClienteController extends Controller
             'fecha_instalacion' => 'nullable|date',
             'notas' => 'nullable|string',
             'cobrador_id' => 'nullable|exists:cobradors,id',
+            'tipo_alta' => 'required|in:nuevo,antiguo',
+            'plan_servicio_id' => 'nullable|exists:plan_servicios,id',
         ]);
 
+        $planId = $validated['plan_servicio_id'] ?? null;
+        unset($validated['plan_servicio_id']);
+
         $cliente = Cliente::create($validated);
+        $facturacion = app(FacturacionService::class);
+        $facturacion->aplicarPeriodoAlta($cliente, $validated['tipo_alta']);
+
+        $mensaje = 'Cliente creado correctamente.';
+        if ($planId) {
+            $facturacion->asignarServicioYFacturar($cliente, (int) $planId);
+            $mensaje = $cliente->tipo_alta === 'antiguo'
+                ? 'Cliente antiguo creado y se generó la factura del mes en curso.'
+                : 'Cliente nuevo creado. Primera factura: ' . $cliente->fresh()->etiquetaPrimeraFactura() . '. Este mes queda libre.';
+        } elseif ($cliente->tipo_alta === 'nuevo') {
+            $mensaje = 'Cliente nuevo creado. Primera factura: ' . $cliente->fresh()->etiquetaPrimeraFactura() . '.';
+        }
 
         return redirect()->route('clientes.show', $cliente)
-            ->with('success', 'Cliente creado correctamente');
+            ->with('success', $mensaje);
     }
 
     public function show(Cliente $cliente)

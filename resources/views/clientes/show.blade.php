@@ -28,6 +28,19 @@
             <div class="card-body">
                 <table class="table table-sm table-borderless mb-0">
                     <tr>
+                        <td class="text-muted">Alta:</td>
+                        <td>
+                            @if($cliente->esNuevo())
+                                <span class="badge bg-info">Cliente nuevo</span>
+                                @if($cliente->etiquetaPrimeraFactura())
+                                    <div class="small text-muted mt-1">Primera factura: {{ $cliente->etiquetaPrimeraFactura() }}</div>
+                                @endif
+                            @else
+                                <span class="badge bg-secondary">Cliente antiguo</span>
+                            @endif
+                        </td>
+                    </tr>
+                    <tr>
                         <td class="text-muted">Estado:</td>
                         <td>
                             @switch($cliente->estado)

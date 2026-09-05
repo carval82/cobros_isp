@@ -219,14 +219,28 @@ class AdminAppController extends Controller
             'direccion' => 'nullable|string|max:255',
             'barrio' => 'nullable|string|max:100',
             'cobrador_id' => 'nullable|exists:cobradors,id',
+            'tipo_alta' => 'required|in:nuevo,antiguo',
+            'plan_servicio_id' => 'nullable|exists:plan_servicios,id',
         ]);
 
-        $cliente = Cliente::create($request->all());
+        $facturacion = app(\App\Services\FacturacionService::class);
+        $cliente = Cliente::create($request->except(['tipo_alta', 'plan_servicio_id']));
+        $facturacion->aplicarPeriodoAlta($cliente, $request->tipo_alta);
+
+        if ($request->plan_servicio_id) {
+            $facturacion->asignarServicioYFacturar($cliente, (int) $request->plan_servicio_id);
+        }
+
+        $cliente->refresh();
+        $mensaje = $request->tipo_alta === 'antiguo'
+            ? 'Cliente antiguo creado. Se generó la factura del mes en curso si tiene plan.'
+            : 'Cliente nuevo creado. Primera factura: ' . $cliente->etiquetaPrimeraFactura() . '. Este mes queda libre.';
 
         return response()->json([
             'success' => true,
-            'message' => 'Cliente creado exitosamente',
+            'message' => $mensaje,
             'cliente' => $cliente,
+            'primera_factura' => $cliente->etiquetaPrimeraFactura(),
         ]);
     }
 
@@ -280,6 +294,8 @@ class AdminAppController extends Controller
                 'direccion' => $cliente->direccion,
                 'barrio' => $cliente->barrio,
                 'estado' => $cliente->estado,
+                'tipo_alta' => $cliente->tipo_alta,
+                'primera_factura' => $cliente->etiquetaPrimeraFactura(),
                 'proyecto_id' => $cliente->proyecto_id,
                 'proyecto' => $cliente->proyecto?->nombre,
                 'cobrador_id' => $cliente->cobrador_id,
@@ -667,10 +683,22 @@ class AdminAppController extends Controller
             'estado' => 'activo',
         ]);
 
+        $cliente = Cliente::find($request->cliente_id);
+        $factura = app(\App\Services\FacturacionService::class)
+            ->generarFacturaSiCorrespondeAlAlta($cliente, $servicio->fresh(['planServicio', 'cliente']));
+
+        $mensaje = 'Servicio asignado exitosamente';
+        if ($factura) {
+            $mensaje .= '. Se generó la factura del mes en curso.';
+        } elseif ($cliente->esNuevo()) {
+            $mensaje .= '. Cliente nuevo: primera factura en ' . $cliente->etiquetaPrimeraFactura();
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Servicio asignado exitosamente',
+            'message' => $mensaje,
             'servicio' => $servicio,
+            'factura_generada' => (bool) $factura,
         ]);
     }
 

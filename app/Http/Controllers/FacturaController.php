@@ -143,32 +143,18 @@ class FacturaController extends Controller
         $generadas = 0;
         $omitidas = 0;
 
+        $facturacion = app(\App\Services\FacturacionService::class);
         foreach ($servicios as $servicio) {
-            if ($servicio->tieneFacturaMes($validated['mes'], $validated['anio'])) {
+            $factura = $facturacion->generarFacturaPeriodo($servicio, (int) $validated['mes'], (int) $validated['anio']);
+            if ($factura) {
+                $generadas++;
+            } else {
                 $omitidas++;
-                continue;
             }
-
-            $precio = $servicio->precio_mensual;
-            
-            Factura::create([
-                'cliente_id' => $servicio->cliente_id,
-                'servicio_id' => $servicio->id,
-                'mes' => $validated['mes'],
-                'anio' => $validated['anio'],
-                'fecha_emision' => now(),
-                'fecha_vencimiento' => Carbon::create($validated['anio'], $validated['mes'], $servicio->dia_pago_limite),
-                'subtotal' => $precio,
-                'total' => $precio,
-                'saldo' => $precio,
-                'concepto' => "Servicio de Internet - " . $servicio->planServicio->nombre,
-            ]);
-
-            $generadas++;
         }
 
         return redirect()->route('facturas.index', ['mes' => $validated['mes'], 'anio' => $validated['anio']])
-            ->with('success', "Se generaron {$generadas} facturas. {$omitidas} omitidas (ya existían).");
+            ->with('success', "Se generaron {$generadas} facturas. {$omitidas} omitidas (ya existían o mes libre).");
     }
 
     public function pdf(Factura $factura)
@@ -211,28 +197,14 @@ class FacturaController extends Controller
         $generadas = 0;
         $omitidas = 0;
 
+        $facturacion = app(\App\Services\FacturacionService::class);
         foreach ($servicios as $servicio) {
-            if ($servicio->tieneFacturaMes($validated['mes'], $validated['anio'])) {
+            $factura = $facturacion->generarFacturaPeriodo($servicio, (int) $validated['mes'], (int) $validated['anio']);
+            if ($factura) {
+                $generadas++;
+            } else {
                 $omitidas++;
-                continue;
             }
-
-            $precio = $servicio->precio_mensual;
-            
-            Factura::create([
-                'cliente_id' => $servicio->cliente_id,
-                'servicio_id' => $servicio->id,
-                'mes' => $validated['mes'],
-                'anio' => $validated['anio'],
-                'fecha_emision' => now(),
-                'fecha_vencimiento' => Carbon::create($validated['anio'], $validated['mes'], $servicio->dia_pago_limite),
-                'subtotal' => $precio,
-                'total' => $precio,
-                'saldo' => $precio,
-                'concepto' => "Servicio de Internet - " . $servicio->planServicio->nombre,
-            ]);
-
-            $generadas++;
         }
 
         $proyectoNombre = $request->filled('proyecto_id') 
@@ -272,6 +244,11 @@ class FacturaController extends Controller
         $omitidas = 0;
 
         foreach ($query->get() as $servicio) {
+            if ($servicio->cliente && ! $servicio->cliente->puedeFacturarseEn($mes, $anio)) {
+                $omitidas++;
+                continue;
+            }
+
             if ($servicio->tieneFacturaMes($mes, $anio)) {
                 $omitidas++;
                 continue;

@@ -18,6 +18,38 @@
             @csrf
             
             <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Tipo de alta *</label>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="border rounded p-3 d-block h-100 {{ old('tipo_alta', 'nuevo') == 'nuevo' ? 'border-success' : '' }}" style="cursor:pointer">
+                                <input type="radio" name="tipo_alta" value="nuevo" class="form-check-input me-2" {{ old('tipo_alta', 'nuevo') == 'nuevo' ? 'checked' : '' }} required>
+                                <strong>Cliente nuevo</strong>
+                                <div class="small text-muted mt-1">Queda un mes libre. Si entra hoy (día 1-15) la primera factura es {{ $facturacion->etiquetaPeriodo($periodoNuevo['mes'], $periodoNuevo['anio']) }}. Si entra después del 15, se corre un mes más.</div>
+                            </label>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="border rounded p-3 d-block h-100 {{ old('tipo_alta') == 'antiguo' ? 'border-primary' : '' }}" style="cursor:pointer">
+                                <input type="radio" name="tipo_alta" value="antiguo" class="form-check-input me-2" {{ old('tipo_alta') == 'antiguo' ? 'checked' : '' }}>
+                                <strong>Cliente antiguo</strong>
+                                <div class="small text-muted mt-1">Ya venía del servicio. Se genera automáticamente la factura de {{ $facturacion->etiquetaPeriodo($periodoAntiguo['mes'], $periodoAntiguo['anio']) }} si le asignas un plan.</div>
+                            </label>
+                        </div>
+                    </div>
+                    @error('tipo_alta')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Plan (opcional)</label>
+                    <select name="plan_servicio_id" class="form-select">
+                        <option value="">Asignar después</option>
+                        @foreach($planes as $plan)
+                            <option value="{{ $plan->id }}" {{ old('plan_servicio_id') == $plan->id ? 'selected' : '' }}>
+                                {{ $plan->nombre }} - ${{ number_format($plan->precio, 0, ',', '.') }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">Si eliges plan, se crea el servicio y la factura según el tipo de alta.</small>
+                </div>
                 <div class="col-md-4">
                     <label class="form-label">Proyecto *</label>
                     <select name="proyecto_id" class="form-select @error('proyecto_id') is-invalid @enderror" required>
