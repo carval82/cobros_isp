@@ -151,10 +151,66 @@ class FacturacionService
         return $this->generarFacturaPeriodo($servicio, $mes, $anio);
     }
 
+    public function cerrarCuentasPorRetiro(Cliente $cliente): array
+    {
+        if ($cliente->estado !== 'retirado') {
+            $cliente->update(['estado' => 'retirado']);
+        }
+
+        $facturas = $cliente->facturas()
+            ->whereIn('estado', ['pendiente', 'parcial', 'vencida'])
+            ->get();
+
+        $anuladas = 0;
+        foreach ($facturas as $factura) {
+            $notaRetiro = 'Anulada por retiro del cliente el ' . now()->format('d/m/Y') . '.';
+            $factura->update([
+                'estado' => 'anulada',
+                'saldo' => 0,
+                'notas' => trim(($factura->notas ? $factura->notas . "\n" : '') . $notaRetiro),
+            ]);
+            $anuladas++;
+        }
+
+        $servicios = $cliente->servicios()
+            ->whereIn('estado', ['activo', 'suspendido', 'cortado'])
+            ->get();
+
+        $cancelados = 0;
+        foreach ($servicios as $servicio) {
+            $servicio->update([
+                'estado' => 'cancelado',
+                'fecha_fin' => now()->toDateString(),
+            ]);
+            $cancelados++;
+        }
+
+        $partes = ['Cliente retirado.'];
+        if ($anuladas > 0) {
+            $partes[] = "Se anularon {$anuladas} factura(s) pendiente(s).";
+        }
+        if ($cancelados > 0) {
+            $partes[] = "Se canceló el servicio.";
+        }
+        if ($anuladas === 0 && $cancelados === 0) {
+            $partes[] = 'No tenía cuentas ni servicio pendiente.';
+        }
+
+        return [
+            'facturas_anuladas' => $anuladas,
+            'servicios_cancelados' => $cancelados,
+            'mensaje' => implode(' ', $partes),
+        ];
+    }
+
     public function generarFacturaPeriodo(Servicio $servicio, int $mes, int $anio): ?Factura
     {
         $servicio->loadMissing(['cliente', 'planServicio']);
         $cliente = $servicio->cliente;
+
+        if ($cliente && $cliente->estado === 'retirado') {
+            return null;
+        }
 
         if ($cliente && ! $cliente->puedeFacturarseEn($mes, $anio)) {
             return null;

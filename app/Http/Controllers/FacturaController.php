@@ -43,6 +43,7 @@ class FacturaController extends Controller
     {
         $servicios = Servicio::with(['cliente', 'planServicio'])
             ->where('estado', 'activo')
+            ->whereHas('cliente', fn ($q) => $q->where('estado', '!=', 'retirado'))
             ->get();
         return view('facturas.create', compact('servicios'));
     }
@@ -138,6 +139,7 @@ class FacturaController extends Controller
 
         $servicios = Servicio::with(['cliente', 'planServicio'])
             ->where('estado', 'activo')
+            ->whereHas('cliente', fn ($q) => $q->where('estado', '!=', 'retirado'))
             ->get();
 
         $generadas = 0;
@@ -203,7 +205,8 @@ class FacturaController extends Controller
         ]);
 
         $query = Servicio::with(['cliente', 'planServicio'])
-            ->where('estado', 'activo');
+            ->where('estado', 'activo')
+            ->whereHas('cliente', fn ($q) => $q->where('estado', '!=', 'retirado'));
 
         if ($request->filled('proyecto_id')) {
             $query->whereHas('cliente', function($q) use ($validated) {
@@ -251,7 +254,8 @@ class FacturaController extends Controller
     private function generarFacturasActivas(int $mes, int $anio, ?int $proyectoId = null): array
     {
         $query = Servicio::with(['cliente', 'planServicio'])
-            ->where('estado', 'activo');
+            ->where('estado', 'activo')
+            ->whereHas('cliente', fn ($q) => $q->where('estado', '!=', 'retirado'));
 
         if ($proyectoId) {
             $query->whereHas('cliente', function ($q) use ($proyectoId) {

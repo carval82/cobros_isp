@@ -161,16 +161,34 @@ class ClienteController extends Controller
 
         $tipoAlta = $validated['tipo_alta'];
         unset($validated['tipo_alta']);
+        $facturacion = app(FacturacionService::class);
         $cliente->update($validated);
 
         $mensaje = 'Cliente actualizado correctamente.';
-        if ($tipoAlta !== $cliente->tipo_alta) {
-            $resultado = app(FacturacionService::class)->corregirTipoAlta($cliente->fresh(), $tipoAlta);
+        if ($validated['estado'] === 'retirado') {
+            $retiro = $facturacion->cerrarCuentasPorRetiro($cliente->fresh());
+            $mensaje = $retiro['mensaje'];
+        } elseif ($tipoAlta !== $cliente->tipo_alta) {
+            $resultado = $facturacion->corregirTipoAlta($cliente->fresh(), $tipoAlta);
             $mensaje = $resultado['mensaje'];
         }
 
         return redirect()->route('clientes.show', $cliente)
             ->with('success', $mensaje);
+    }
+
+    public function retirar(Cliente $cliente)
+    {
+        if ($cliente->estado === 'retirado') {
+            $retiro = app(FacturacionService::class)->cerrarCuentasPorRetiro($cliente);
+            return redirect()->route('clientes.show', $cliente)
+                ->with('success', $retiro['mensaje']);
+        }
+
+        $retiro = app(FacturacionService::class)->cerrarCuentasPorRetiro($cliente);
+
+        return redirect()->route('clientes.show', $cliente)
+            ->with('success', $retiro['mensaje']);
     }
 
     public function destroy(Cliente $cliente)

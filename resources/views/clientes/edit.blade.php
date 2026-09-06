@@ -113,12 +113,15 @@
                 
                 <div class="col-md-4">
                     <label class="form-label">Estado</label>
-                    <select name="estado" class="form-select">
+                    <select name="estado" id="estadoCliente" class="form-select">
                         <option value="activo" {{ old('estado', $cliente->estado) == 'activo' ? 'selected' : '' }}>Activo</option>
                         <option value="suspendido" {{ old('estado', $cliente->estado) == 'suspendido' ? 'selected' : '' }}>Suspendido</option>
                         <option value="cortado" {{ old('estado', $cliente->estado) == 'cortado' ? 'selected' : '' }}>Cortado</option>
                         <option value="retirado" {{ old('estado', $cliente->estado) == 'retirado' ? 'selected' : '' }}>Retirado</option>
                     </select>
+                    <div id="avisoRetiro" class="alert alert-warning py-2 px-3 mt-2 mb-0 small {{ old('estado', $cliente->estado) == 'retirado' ? '' : 'd-none' }}">
+                        Al retirarlo se anulan las facturas pendientes y se cancela el servicio. No queda con cuentas por cobrar.
+                    </div>
                 </div>
                 
                 <div class="col-md-4">
@@ -161,3 +164,15 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    const estado = document.getElementById('estadoCliente');
+    const aviso = document.getElementById('avisoRetiro');
+    if (estado && aviso) {
+        estado.addEventListener('change', function () {
+            aviso.classList.toggle('d-none', this.value !== 'retirado');
+        });
+    }
+</script>
+@endpush

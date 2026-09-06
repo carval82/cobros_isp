@@ -9,6 +9,15 @@
         <small class="text-muted">({{ $cliente->codigo }})</small>
     </h1>
     <div class="btn-group">
+        @if($cliente->estado !== 'retirado')
+        <form action="{{ route('clientes.retirar', $cliente) }}" method="POST" class="d-inline"
+            onsubmit="return confirm('¿Retirar a {{ $cliente->nombre }}? Se anularán las facturas pendientes y se cancelará el servicio. No quedará con cuentas por cobrar.')">
+            @csrf
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="fas fa-user-slash me-1"></i>Retirar cliente
+            </button>
+        </form>
+        @endif
         <a href="{{ route('clientes.edit', $cliente) }}" class="btn btn-outline-primary">
             <i class="fas fa-edit me-1"></i>Editar
         </a>

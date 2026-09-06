@@ -53,8 +53,12 @@ class ServicioController extends Controller
             'notas' => 'nullable|string',
         ]);
 
+        $cliente = Cliente::findOrFail($validated['cliente_id']);
+        if ($cliente->estado === 'retirado') {
+            return back()->with('error', 'No se puede asignar servicio a un cliente retirado.');
+        }
+
         $servicio = Servicio::create($validated);
-        $cliente = Cliente::find($validated['cliente_id']);
         $factura = app(FacturacionService::class)->generarFacturaSiCorrespondeAlAlta($cliente, $servicio->fresh(['planServicio', 'cliente']));
 
         $mensaje = 'Servicio creado correctamente';

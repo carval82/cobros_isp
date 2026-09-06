@@ -258,7 +258,7 @@ class AdminAppController extends Controller
             'documento' => 'sometimes|string|max:20',
             'celular' => 'nullable|string|max:20',
             'direccion' => 'nullable|string|max:255',
-            'estado' => 'sometimes|in:activo,suspendido,retirado',
+            'estado' => 'sometimes|in:activo,suspendido,retirado,cortado',
             'cobrador_id' => 'nullable|exists:cobradors,id',
             'tipo_alta' => 'sometimes|in:nuevo,antiguo',
         ]);
@@ -268,8 +268,14 @@ class AdminAppController extends Controller
 
         $mensaje = 'Cliente actualizado exitosamente';
         $primeraFactura = $cliente->fresh()->etiquetaPrimeraFactura();
-        if ($tipoAlta && $tipoAlta !== $cliente->tipo_alta) {
-            $resultado = app(\App\Services\FacturacionService::class)->corregirTipoAlta($cliente->fresh(), $tipoAlta);
+        $facturacion = app(\App\Services\FacturacionService::class);
+        $quedaRetirado = ($request->input('estado') ?? $cliente->estado) === 'retirado';
+
+        if ($quedaRetirado) {
+            $retiro = $facturacion->cerrarCuentasPorRetiro($cliente->fresh());
+            $mensaje = $retiro['mensaje'];
+        } elseif ($tipoAlta && $tipoAlta !== $cliente->tipo_alta) {
+            $resultado = $facturacion->corregirTipoAlta($cliente->fresh(), $tipoAlta);
             $mensaje = $resultado['mensaje'];
             $primeraFactura = $resultado['primera_factura'];
         }
@@ -687,6 +693,14 @@ class AdminAppController extends Controller
             'fecha_inicio' => 'nullable|date',
         ]);
 
+        $cliente = Cliente::findOrFail($request->cliente_id);
+        if ($cliente->estado === 'retirado') {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede asignar servicio a un cliente retirado.',
+            ], 422);
+        }
+
         $servicio = Servicio::create([
             'cliente_id' => $request->cliente_id,
             'plan_servicio_id' => $request->plan_servicio_id,
@@ -699,7 +713,6 @@ class AdminAppController extends Controller
             'estado' => 'activo',
         ]);
 
-        $cliente = Cliente::find($request->cliente_id);
         $factura = app(\App\Services\FacturacionService::class)
             ->generarFacturaSiCorrespondeAlAlta($cliente, $servicio->fresh(['planServicio', 'cliente']));
 

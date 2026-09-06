@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
     // Recursos
     Route::resource('proyectos', ProyectoController::class);
     Route::resource('clientes', ClienteController::class);
+    Route::post('clientes/{cliente}/retirar', [ClienteController::class, 'retirar'])->name('clientes.retirar');
     Route::resource('cobradores', CobradorController::class);
     Route::resource('planes', PlanServicioController::class);
     Route::resource('servicios', ServicioController::class);

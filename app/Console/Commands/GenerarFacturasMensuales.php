@@ -33,7 +33,10 @@ class GenerarFacturasMensuales extends Command
         $this->info("Generando facturas para {$mes}/{$anio}...");
 
         $query = Servicio::with(['cliente', 'planServicio'])
-            ->where('estado', 'activo');
+            ->where('estado', 'activo')
+            ->whereHas('cliente', function ($q) {
+                $q->where('estado', '!=', 'retirado');
+            });
 
         if ($proyectoId) {
             $proyecto = Proyecto::find($proyectoId);
