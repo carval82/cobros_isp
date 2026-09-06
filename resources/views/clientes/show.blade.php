@@ -53,6 +53,9 @@
                             <div class="mt-2">
                                 @if($cliente->factura_electronica)
                                     <span class="badge bg-primary">Factura electrónica Alegra</span>
+                                    @if(! $cliente->listoParaFacturaElectronica())
+                                        <div class="small text-danger mt-1">Falta: {{ implode(', ', $cliente->faltantesFacturaElectronica()) }}.</div>
+                                    @endif
                                 @else
                                     <span class="badge bg-light text-muted border">Cuenta de cobro interna</span>
                                 @endif
@@ -80,7 +83,12 @@
                     </tr>
                     <tr>
                         <td class="text-muted">Documento:</td>
-                        <td>{{ $cliente->tipo_documento }} {{ $cliente->documento ?: '-' }}</td>
+                        <td>
+                            {{ $cliente->tipo_documento }} {{ $cliente->documentoConDv() ?: '-' }}
+                            @if($cliente->tipo_persona)
+                                <span class="badge bg-light text-muted border">{{ $cliente->tipo_persona === 'juridica' ? 'Jurídica' : 'Natural' }}</span>
+                            @endif
+                        </td>
                     </tr>
                     <tr>
                         <td class="text-muted">Teléfono:</td>

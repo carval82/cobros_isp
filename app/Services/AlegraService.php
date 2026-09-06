@@ -32,6 +32,14 @@ class AlegraService
             ];
         }
 
+        $faltan = $cliente->faltantesFacturaElectronica();
+        if ($faltan !== []) {
+            return [
+                'ok' => false,
+                'message' => 'Faltan datos del cliente para la DIAN: ' . implode(', ', $faltan) . '.',
+            ];
+        }
+
         try {
             if (! $factura->alegra_id) {
                 $contactId = $this->asegurarContacto($cliente);
@@ -96,24 +104,77 @@ class AlegraService
 
     public function asegurarContacto(Cliente $cliente): string
     {
+        $payload = $this->payloadContacto($cliente);
+
         if ($cliente->alegra_contact_id) {
+            try {
+                $this->request('put', '/contacts/' . $cliente->alegra_contact_id, $payload);
+            } catch (\Throwable $e) {
+                // Si el contacto ya no existe en Alegra, se crea de nuevo.
+                $res = $this->request('post', '/contacts', $payload);
+                $cliente->update(['alegra_contact_id' => (string) ($res['id'] ?? '')]);
+            }
+
             return (string) $cliente->alegra_contact_id;
         }
 
-        $res = $this->request('post', '/contacts', [
-            'name' => $cliente->nombre,
-            'identification' => $cliente->documento,
-            'phonePrimary' => $cliente->celular ?: $cliente->telefono,
-            'email' => $cliente->email,
-            'address' => ['address' => $cliente->direccion],
-            'type' => ['client'],
-            'status' => 'active',
-        ]);
-
+        $res = $this->request('post', '/contacts', $payload);
         $id = (string) ($res['id'] ?? '');
         $cliente->update(['alegra_contact_id' => $id]);
 
         return $id;
+    }
+
+    private function payloadContacto(Cliente $cliente): array
+    {
+        $numero = $cliente->documentoLimpio();
+        $dv = $cliente->dv ?: ($cliente->tipo_documento === 'NIT' ? $cliente->calcularDv($numero) : null);
+        $ident = [
+            'type' => $cliente->tipo_documento ?: 'CC',
+            'number' => $numero,
+        ];
+        if ($ident['type'] === 'NIT' && filled($dv)) {
+            $ident['dv'] = (string) $dv;
+        }
+
+        return [
+            'name' => $cliente->nombre,
+            'nameObject' => $this->nombreObjeto($cliente->nombre),
+            'identificationObject' => $ident,
+            'kindOfPerson' => $cliente->tipo_persona === 'juridica' ? 'LEGAL_ENTITY' : 'PERSON_ENTITY',
+            'regime' => $cliente->regimen === 'comun' ? 'COMMON_REGIME' : 'SIMPLIFIED_REGIME',
+            'email' => $cliente->email,
+            'phonePrimary' => $cliente->celular ?: $cliente->telefono,
+            'mobile' => $cliente->celular,
+            'address' => [
+                'address' => $cliente->direccion,
+                'city' => $cliente->municipio ?: 'Villamaría',
+                'department' => $cliente->departamento ?: 'Caldas',
+                'country' => 'Colombia',
+            ],
+            'type' => ['client'],
+            'status' => 'active',
+            'settings' => [
+                'sendElectronicDocuments' => true,
+            ],
+        ];
+    }
+
+    private function nombreObjeto(string $nombre): array
+    {
+        $partes = preg_split('/\s+/', trim($nombre)) ?: [];
+        $primero = $partes[0] ?? $nombre;
+        $segundo = count($partes) > 3 ? ($partes[1] ?? '') : '';
+        $apellidos = count($partes) > 3
+            ? array_slice($partes, 2)
+            : array_slice($partes, 1);
+
+        return array_filter([
+            'firstName' => $primero,
+            'secondName' => $segundo,
+            'lastName' => $apellidos[0] ?? $primero,
+            'secondLastName' => $apellidos[1] ?? null,
+        ]);
     }
 
     private function enviarADian(string $alegraId): void

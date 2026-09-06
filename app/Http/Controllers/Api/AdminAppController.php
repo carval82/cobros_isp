@@ -219,6 +219,11 @@ class AdminAppController extends Controller
             'proyecto_id' => 'required|exists:proyectos,id',
             'nombre' => 'required|string|max:255',
             'documento' => 'required|string|max:20',
+            'tipo_documento' => 'nullable|in:CC,NIT,CE,TI,PP',
+            'dv' => 'nullable|string|max:1',
+            'tipo_persona' => 'nullable|in:natural,juridica',
+            'regimen' => 'nullable|in:simplificado,comun',
+            'email' => 'nullable|email|max:100',
             'celular' => 'nullable|string|max:20',
             'direccion' => 'nullable|string|max:255',
             'barrio' => 'nullable|string|max:100',
@@ -228,8 +233,9 @@ class AdminAppController extends Controller
             'factura_electronica' => 'nullable|boolean',
         ]);
 
+        $datos = Cliente::normalizarIdentificacion($request->except(['tipo_alta', 'plan_servicio_id']));
         $facturacion = app(\App\Services\FacturacionService::class);
-        $cliente = Cliente::create($request->except(['tipo_alta', 'plan_servicio_id']));
+        $cliente = Cliente::create($datos);
         $facturacion->aplicarPeriodoAlta($cliente, $request->tipo_alta);
 
         if ($request->plan_servicio_id) {
@@ -256,6 +262,11 @@ class AdminAppController extends Controller
         $request->validate([
             'nombre' => 'sometimes|string|max:255',
             'documento' => 'sometimes|string|max:20',
+            'tipo_documento' => 'sometimes|in:CC,NIT,CE,TI,PP',
+            'dv' => 'nullable|string|max:1',
+            'tipo_persona' => 'nullable|in:natural,juridica',
+            'regimen' => 'nullable|in:simplificado,comun',
+            'email' => 'nullable|email|max:100',
             'celular' => 'nullable|string|max:20',
             'direccion' => 'nullable|string|max:255',
             'estado' => 'sometimes|in:activo,suspendido,retirado,cortado',
@@ -264,7 +275,8 @@ class AdminAppController extends Controller
         ]);
 
         $tipoAlta = $request->input('tipo_alta');
-        $cliente->update($request->except(['tipo_alta']));
+        $datos = Cliente::normalizarIdentificacion($request->except(['tipo_alta']));
+        $cliente->update($datos);
 
         $mensaje = 'Cliente actualizado exitosamente';
         $primeraFactura = $cliente->fresh()->etiquetaPrimeraFactura();
@@ -310,6 +322,11 @@ class AdminAppController extends Controller
                 'codigo' => $cliente->codigo,
                 'nombre' => $cliente->nombre,
                 'documento' => $cliente->documento,
+                'dv' => $cliente->dv,
+                'tipo_documento' => $cliente->tipo_documento,
+                'tipo_persona' => $cliente->tipo_persona,
+                'regimen' => $cliente->regimen,
+                'factura_electronica' => (bool) $cliente->factura_electronica,
                 'celular' => $cliente->celular,
                 'telefono' => $cliente->telefono,
                 'email' => $cliente->email,

@@ -38,10 +38,6 @@
                         </div>
                     </div>
                     @error('tipo_alta')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                    <div class="form-check mt-3">
-                        <input type="checkbox" name="factura_electronica" value="1" class="form-check-input" id="factura_electronica" {{ old('factura_electronica', $cliente->factura_electronica) ? 'checked' : '' }}>
-                        <label class="form-check-label" for="factura_electronica">Causar factura electrónica en Alegra</label>
-                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Proyecto *</label>
@@ -60,20 +56,7 @@
                     @error('nombre')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 
-                <div class="col-md-3">
-                    <label class="form-label">Tipo Documento</label>
-                    <select name="tipo_documento" class="form-select">
-                        <option value="CC" {{ old('tipo_documento', $cliente->tipo_documento) == 'CC' ? 'selected' : '' }}>CC</option>
-                        <option value="NIT" {{ old('tipo_documento', $cliente->tipo_documento) == 'NIT' ? 'selected' : '' }}>NIT</option>
-                        <option value="CE" {{ old('tipo_documento', $cliente->tipo_documento) == 'CE' ? 'selected' : '' }}>CE</option>
-                        <option value="TI" {{ old('tipo_documento', $cliente->tipo_documento) == 'TI' ? 'selected' : '' }}>TI</option>
-                    </select>
-                </div>
-                
-                <div class="col-md-3">
-                    <label class="form-label">Documento</label>
-                    <input type="text" name="documento" class="form-control" value="{{ old('documento', $cliente->documento) }}">
-                </div>
+                @include('clientes.partials.datos-tributarios', ['cliente' => $cliente])
                 
                 <div class="col-md-4">
                     <label class="form-label">Teléfono</label>
@@ -83,11 +66,6 @@
                 <div class="col-md-4">
                     <label class="form-label">Celular</label>
                     <input type="text" name="celular" class="form-control" value="{{ old('celular', $cliente->celular) }}">
-                </div>
-                
-                <div class="col-md-4">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" value="{{ old('email', $cliente->email) }}">
                 </div>
                 
                 <div class="col-md-8">

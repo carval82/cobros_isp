@@ -19,7 +19,7 @@
             </button>
         </form>
         @endif
-        @if($factura->cliente->factura_electronica)
+        @if($factura->cliente->factura_electronica && $factura->cliente->listoParaFacturaElectronica())
         <form action="{{ route('facturas.alegra', $factura) }}" method="POST" class="d-inline">
             @csrf
             <button type="submit" class="btn {{ $factura->cufe ? 'btn-outline-success' : 'btn-outline-primary' }}">
@@ -33,6 +33,10 @@
                 @endif
             </button>
         </form>
+        @elseif($factura->cliente->factura_electronica)
+        <a href="{{ route('clientes.edit', $factura->cliente) }}" class="btn btn-warning">
+            <i class="fas fa-id-card me-1"></i>Completar NIT/RUT
+        </a>
         @endif
         <a href="{{ route('facturas.pdf', $factura) }}" class="btn btn-danger" target="_blank">
             <i class="fas fa-file-pdf me-1"></i>Ver PDF
@@ -53,6 +57,13 @@
         </a>
     </div>
 </div>
+
+@if($factura->cliente->factura_electronica && ! $factura->cliente->listoParaFacturaElectronica())
+    <div class="alert alert-warning">
+        No se puede causar en Alegra: falta {{ implode(', ', $factura->cliente->faltantesFacturaElectronica()) }}.
+        <a href="{{ route('clientes.edit', $factura->cliente) }}">Completar datos del cliente</a>
+    </div>
+@endif
 
 <div class="row g-4">
     <div class="col-lg-6">

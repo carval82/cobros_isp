@@ -206,7 +206,7 @@
                 <p><strong>{{ $factura->cliente->nombre }}</strong></p>
                 <p><span class="label">Código:</span> {{ $factura->cliente->codigo }}</p>
                 @if($factura->cliente->documento)
-                <p><span class="label">{{ $factura->cliente->tipo_documento }}:</span> {{ $factura->cliente->documento }}</p>
+                <p><span class="label">{{ $factura->cliente->tipo_documento }}:</span> {{ $factura->cliente->documentoConDv() }}</p>
                 @endif
                 <p><span class="label">Dirección:</span> {{ $factura->cliente->direccion }}</p>
                 @if($factura->cliente->celular)

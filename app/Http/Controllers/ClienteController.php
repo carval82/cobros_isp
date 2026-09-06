@@ -66,7 +66,10 @@ class ClienteController extends Controller
             'proyecto_id' => 'nullable|exists:proyectos,id',
             'nombre' => 'required|string|max:150',
             'documento' => 'nullable|string|max:20',
-            'tipo_documento' => 'required|string|max:10',
+            'tipo_documento' => 'required|in:CC,NIT,CE,TI,PP',
+            'dv' => 'nullable|string|max:1',
+            'tipo_persona' => 'nullable|in:natural,juridica',
+            'regimen' => 'nullable|in:simplificado,comun',
             'telefono' => 'nullable|string|max:20',
             'celular' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
@@ -86,6 +89,19 @@ class ClienteController extends Controller
         $planId = $validated['plan_servicio_id'] ?? null;
         unset($validated['plan_servicio_id']);
         $validated['factura_electronica'] = $request->boolean('factura_electronica');
+        $validated = Cliente::normalizarIdentificacion($validated);
+        if ($validated['factura_electronica']) {
+            $request->merge($validated);
+            $request->validate([
+                'documento' => 'required|string|max:20',
+                'email' => 'required|email|max:100',
+            ], [
+                'documento.required' => 'Para factura electrónica se necesita la cédula o el NIT/RUT.',
+                'email.required' => 'Para factura electrónica se necesita el correo del cliente.',
+            ]);
+            $validated['documento'] = $request->documento;
+            $validated['email'] = $request->email;
+        }
 
         $cliente = Cliente::create($validated);
         $facturacion = app(FacturacionService::class);
@@ -140,7 +156,10 @@ class ClienteController extends Controller
         $validated = $request->validate([
             'nombre' => 'required|string|max:150',
             'documento' => 'nullable|string|max:20',
-            'tipo_documento' => 'required|string|max:10',
+            'tipo_documento' => 'required|in:CC,NIT,CE,TI,PP',
+            'dv' => 'nullable|string|max:1',
+            'tipo_persona' => 'nullable|in:natural,juridica',
+            'regimen' => 'nullable|in:simplificado,comun',
             'telefono' => 'nullable|string|max:20',
             'celular' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
@@ -158,6 +177,19 @@ class ClienteController extends Controller
             'factura_electronica' => 'nullable|boolean',
         ]);
         $validated['factura_electronica'] = $request->boolean('factura_electronica');
+        $validated = Cliente::normalizarIdentificacion($validated);
+        if ($validated['factura_electronica']) {
+            $request->merge($validated);
+            $request->validate([
+                'documento' => 'required|string|max:20',
+                'email' => 'required|email|max:100',
+            ], [
+                'documento.required' => 'Para factura electrónica se necesita la cédula o el NIT/RUT.',
+                'email.required' => 'Para factura electrónica se necesita el correo del cliente.',
+            ]);
+            $validated['documento'] = $request->documento;
+            $validated['email'] = $request->email;
+        }
 
         $tipoAlta = $validated['tipo_alta'];
         unset($validated['tipo_alta']);
