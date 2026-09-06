@@ -138,6 +138,12 @@
             font-size: 0.75rem;
             padding: 0.35em 0.65em;
         }
+
+        nav[role="navigation"] svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            max-width: 1.25rem;
+        }
         
         @media (max-width: 768px) {
             .sidebar {
