@@ -224,6 +224,7 @@ class AdminAppController extends Controller
             'cobrador_id' => 'nullable|exists:cobradors,id',
             'tipo_alta' => 'required|in:nuevo,antiguo',
             'plan_servicio_id' => 'nullable|exists:plan_servicios,id',
+            'factura_electronica' => 'nullable|boolean',
         ]);
 
         $facturacion = app(\App\Services\FacturacionService::class);

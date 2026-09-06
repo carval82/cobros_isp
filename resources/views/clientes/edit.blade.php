@@ -38,6 +38,10 @@
                         </div>
                     </div>
                     @error('tipo_alta')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                    <div class="form-check mt-3">
+                        <input type="checkbox" name="factura_electronica" value="1" class="form-check-input" id="factura_electronica" {{ old('factura_electronica', $cliente->factura_electronica) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="factura_electronica">Causar factura electrónica en Alegra</label>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Proyecto *</label>

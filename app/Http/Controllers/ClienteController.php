@@ -80,10 +80,12 @@ class ClienteController extends Controller
             'cobrador_id' => 'nullable|exists:cobradors,id',
             'tipo_alta' => 'required|in:nuevo,antiguo',
             'plan_servicio_id' => 'nullable|exists:plan_servicios,id',
+            'factura_electronica' => 'nullable|boolean',
         ]);
 
         $planId = $validated['plan_servicio_id'] ?? null;
         unset($validated['plan_servicio_id']);
+        $validated['factura_electronica'] = $request->boolean('factura_electronica');
 
         $cliente = Cliente::create($validated);
         $facturacion = app(FacturacionService::class);
@@ -153,7 +155,9 @@ class ClienteController extends Controller
             'cobrador_id' => 'nullable|exists:cobradors,id',
             'proyecto_id' => 'nullable|exists:proyectos,id',
             'tipo_alta' => 'required|in:nuevo,antiguo',
+            'factura_electronica' => 'nullable|boolean',
         ]);
+        $validated['factura_electronica'] = $request->boolean('factura_electronica');
 
         $tipoAlta = $validated['tipo_alta'];
         unset($validated['tipo_alta']);

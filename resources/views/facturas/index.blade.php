@@ -111,6 +111,17 @@
                                 <a href="{{ route('facturas.show', $factura) }}" class="btn btn-outline-primary" title="Ver">
                                     <i class="fas fa-eye"></i>
                                 </a>
+                                <a href="{{ $factura->urlPublica() }}" class="btn btn-outline-secondary" title="Enlace público" target="_blank">
+                                    <i class="fas fa-link"></i>
+                                </a>
+                                @if($factura->urlWhatsApp())
+                                <form action="{{ route('facturas.whatsapp', $factura) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline-success" title="Enviar por WhatsApp">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </button>
+                                </form>
+                                @endif
                                 @if($factura->saldo > 0)
                                 <a href="{{ route('pagos.create', ['factura_id' => $factura->id]) }}" class="btn btn-outline-success" title="Registrar Pago">
                                     <i class="fas fa-dollar-sign"></i>

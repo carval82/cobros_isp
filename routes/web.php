@@ -14,11 +14,16 @@ use App\Http\Controllers\PagoController;
 use App\Http\Controllers\LiquidacionController;
 use App\Http\Controllers\Portal\ClientePortalController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\PublicFacturaController;
 
 // Autenticación
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('login', [AuthController::class, 'login']);
 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+
+// Factura pública para el cliente: no pide login
+Route::get('f/{token}', [PublicFacturaController::class, 'show'])->name('facturas.publica');
+Route::get('f/{token}/pdf', [PublicFacturaController::class, 'pdf'])->name('facturas.publica.pdf');
 
 // Rutas protegidas
 Route::middleware('auth')->group(function () {
@@ -44,6 +49,8 @@ Route::middleware('auth')->group(function () {
     Route::post('pagos/limpiar-historial', [PagoController::class, 'limpiarHistorial'])->name('pagos.limpiar-historial');
     Route::get('facturas/{factura}/pdf', [FacturaController::class, 'pdf'])->name('facturas.pdf');
     Route::get('facturas/{factura}/descargar-pdf', [FacturaController::class, 'descargarPdf'])->name('facturas.descargar-pdf');
+    Route::post('facturas/{factura}/whatsapp', [FacturaController::class, 'enviarWhatsapp'])->name('facturas.whatsapp');
+    Route::post('facturas/{factura}/alegra', [FacturaController::class, 'causarAlegra'])->name('facturas.alegra');
     Route::post('liquidaciones/{liquidacion}/pagar', [LiquidacionController::class, 'pagar'])->name('liquidaciones.pagar');
 
     // Tickets de soporte

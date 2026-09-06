@@ -30,6 +30,8 @@ class Cliente extends Authenticatable
         'referencia_ubicacion',
         'estado',
         'tipo_alta',
+        'factura_electronica',
+        'alegra_contact_id',
         'primer_mes_facturable',
         'primer_anio_facturable',
         'fecha_instalacion',
@@ -48,6 +50,7 @@ class Cliente extends Authenticatable
         'longitud' => 'decimal:8',
         'primer_mes_facturable' => 'integer',
         'primer_anio_facturable' => 'integer',
+        'factura_electronica' => 'boolean',
     ];
 
     public function proyecto(): BelongsTo

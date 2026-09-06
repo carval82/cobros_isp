@@ -41,6 +41,13 @@
                             <div class="small mt-2">
                                 <a href="{{ route('clientes.edit', $cliente) }}">Si te equivocaste, corrige el tipo de alta</a>
                             </div>
+                            <div class="mt-2">
+                                @if($cliente->factura_electronica)
+                                    <span class="badge bg-primary">Factura electrónica Alegra</span>
+                                @else
+                                    <span class="badge bg-light text-muted border">Cuenta de cobro interna</span>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     <tr>

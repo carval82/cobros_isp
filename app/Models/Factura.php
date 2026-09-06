@@ -27,6 +27,9 @@ class Factura extends Model
         'estado',
         'concepto',
         'notas',
+        'token_publico',
+        'alegra_id',
+        'enviada_whatsapp_at',
     ];
 
     protected $casts = [
@@ -37,6 +40,7 @@ class Factura extends Model
         'recargo' => 'decimal:2',
         'total' => 'decimal:2',
         'saldo' => 'decimal:2',
+        'enviada_whatsapp_at' => 'datetime',
     ];
 
     public function cliente(): BelongsTo
@@ -66,6 +70,39 @@ class Factura extends Model
         return $this->estado === 'pendiente' && $this->fecha_vencimiento < now();
     }
 
+    public function asegurarTokenPublico(): string
+    {
+        if (! $this->token_publico) {
+            $this->token_publico = \Illuminate\Support\Str::random(40);
+            $this->save();
+        }
+
+        return $this->token_publico;
+    }
+
+    public function urlPublica(): string
+    {
+        return url('/f/' . $this->asegurarTokenPublico());
+    }
+
+    public function urlWhatsApp(): ?string
+    {
+        $this->loadMissing('cliente');
+        $tel = preg_replace('/\D+/', '', $this->cliente->celular ?: $this->cliente->telefono ?: '');
+        if (! $tel) {
+            return null;
+        }
+        if (strlen($tel) === 10 && str_starts_with($tel, '3')) {
+            $tel = '57' . $tel;
+        }
+        $texto = "Hola {$this->cliente->nombre}, te compartimos tu factura {$this->numero} de INTERVEREDANET ({$this->periodo}) por $"
+            . number_format((float) $this->saldo, 0, ',', '.')
+            . ". Puedes verla aquí, sin necesidad de iniciar sesión: "
+            . $this->urlPublica();
+
+        return 'https://wa.me/' . $tel . '?text=' . rawurlencode($texto);
+    }
+
     public function registrarPago(float $monto): void
     {
         $this->saldo -= $monto;
@@ -91,6 +128,9 @@ class Factura extends Model
             }
             if (empty($factura->saldo)) {
                 $factura->saldo = $factura->total;
+            }
+            if (empty($factura->token_publico)) {
+                $factura->token_publico = \Illuminate\Support\Str::random(40);
             }
         });
     }

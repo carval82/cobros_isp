@@ -8,6 +8,25 @@
         <i class="fas fa-file-invoice-dollar me-2"></i>Factura {{ $factura->numero }}
     </h1>
     <div class="btn-group">
+        <a href="{{ $factura->urlPublica() }}" class="btn btn-outline-success" target="_blank">
+            <i class="fas fa-link me-1"></i>Enlace del cliente
+        </a>
+        @if($factura->urlWhatsApp())
+        <form action="{{ route('facturas.whatsapp', $factura) }}" method="POST" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-success">
+                <i class="fab fa-whatsapp me-1"></i>WhatsApp
+            </button>
+        </form>
+        @endif
+        @if($factura->cliente->factura_electronica)
+        <form action="{{ route('facturas.alegra', $factura) }}" method="POST" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="fas fa-file-invoice me-1"></i>{{ $factura->alegra_id ? 'Ya en Alegra' : 'Causar en Alegra' }}
+            </button>
+        </form>
+        @endif
         <a href="{{ route('facturas.pdf', $factura) }}" class="btn btn-danger" target="_blank">
             <i class="fas fa-file-pdf me-1"></i>Ver PDF
         </a>

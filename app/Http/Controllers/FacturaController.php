@@ -175,6 +175,25 @@ class FacturaController extends Controller
         return $pdf->download("factura-{$factura->numero}.pdf");
     }
 
+    public function enviarWhatsapp(Factura $factura)
+    {
+        $url = $factura->urlWhatsApp();
+        if (! $url) {
+            return back()->with('error', 'El cliente no tiene celular para enviar por WhatsApp.');
+        }
+
+        $factura->update(['enviada_whatsapp_at' => now()]);
+
+        return redirect()->away($url);
+    }
+
+    public function causarAlegra(Factura $factura)
+    {
+        $resultado = app(\App\Services\AlegraService::class)->causarFactura($factura);
+
+        return back()->with($resultado['ok'] ? 'success' : 'error', $resultado['message']);
+    }
+
     public function generarMesProyecto(Request $request)
     {
         $validated = $request->validate([
