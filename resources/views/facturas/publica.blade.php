@@ -28,7 +28,7 @@
             </div>
             <div class="text-end">
                 <div class="muted small">Factura</div>
-                <div class="fw-bold">{{ $factura->numero }}</div>
+                <div class="fw-bold">{{ $factura->numeroMostrar() }}</div>
                 <div>{{ $factura->periodo }}</div>
             </div>
         </div>
@@ -58,6 +58,12 @@
             <div>{{ $factura->concepto }}</div>
         @endif
     </div>
+
+    @if($factura->cufe || $factura->qr_code)
+    <div class="card p-4 mb-3">
+        @include('facturas.partials.electronica', ['compact' => true])
+    </div>
+    @endif
 
     <div class="d-grid gap-2">
         <a class="btn btn-success btn-lg" href="{{ route('facturas.publica.pdf', $token) }}">

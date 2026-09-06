@@ -21,6 +21,7 @@ class PublicFacturaController extends Controller
         $factura->load(['cliente.proyecto', 'servicio.planServicio', 'pagos']);
 
         return Pdf::loadView('facturas.pdf.factura', compact('factura'))
+            ->setOption('isRemoteEnabled', true)
             ->stream("factura-{$factura->numero}.pdf");
     }
 

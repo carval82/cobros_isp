@@ -32,53 +32,59 @@ class AlegraService
             ];
         }
 
-        if ($factura->alegra_id) {
-            return [
-                'ok' => true,
-                'message' => 'Esta factura ya está causada en Alegra.',
-                'alegra_id' => $factura->alegra_id,
-            ];
-        }
-
         try {
-            $contactId = $this->asegurarContacto($cliente);
-            $payload = [
-                'date' => optional($factura->fecha_emision)->format('Y-m-d') ?: now()->toDateString(),
-                'dueDate' => optional($factura->fecha_vencimiento)->format('Y-m-d') ?: now()->toDateString(),
-                'client' => ['id' => $contactId],
-                'items' => [[
-                    'id' => config('alegra.item_id') ?: null,
-                    'name' => $factura->concepto ?: 'Servicio de Internet',
-                    'description' => $factura->concepto ?: 'Servicio de Internet - ' . $factura->periodo,
-                    'price' => (float) $factura->total,
-                    'quantity' => 1,
-                    'unit' => 'service',
-                    'tax' => [],
-                ]],
-                'paymentForm' => 'CREDIT',
-                'paymentMethod' => 'CREDIT',
-                'useElectronicInvoice' => true,
-                'type' => 'NATIONAL',
-                'operationType' => 'STANDARD',
-            ];
+            if (! $factura->alegra_id) {
+                $contactId = $this->asegurarContacto($cliente);
+                $payload = [
+                    'date' => optional($factura->fecha_emision)->format('Y-m-d') ?: now()->toDateString(),
+                    'dueDate' => optional($factura->fecha_vencimiento)->format('Y-m-d') ?: now()->toDateString(),
+                    'client' => ['id' => $contactId],
+                    'items' => [[
+                        'id' => config('alegra.item_id') ?: null,
+                        'name' => $factura->concepto ?: 'Servicio de Internet',
+                        'description' => $factura->concepto ?: 'Servicio de Internet - ' . $factura->periodo,
+                        'price' => (float) $factura->total,
+                        'quantity' => 1,
+                        'unit' => 'service',
+                        'tax' => [],
+                    ]],
+                    'paymentForm' => 'CREDIT',
+                    'paymentMethod' => 'CREDIT',
+                    'useElectronicInvoice' => true,
+                    'type' => 'NATIONAL',
+                    'operationType' => 'STANDARD',
+                ];
 
-            if (! $payload['items'][0]['id']) {
-                unset($payload['items'][0]['id']);
+                if (! $payload['items'][0]['id']) {
+                    unset($payload['items'][0]['id']);
+                }
+                if (config('alegra.number_template_id')) {
+                    $payload['numberTemplate'] = ['id' => (string) config('alegra.number_template_id')];
+                }
+
+                $res = $this->request('post', '/invoices', $payload);
+                $alegraId = (string) ($res['id'] ?? '');
+                $factura->update(['alegra_id' => $alegraId]);
+                $this->guardarDatosDian($factura, $res);
             }
-            if (config('alegra.number_template_id')) {
-                $payload['numberTemplate'] = ['id' => (string) config('alegra.number_template_id')];
+
+            $this->enviarADian((string) $factura->alegra_id);
+            $this->esperarYGuardarDian($factura);
+
+            $factura->refresh();
+            if ($factura->cufe) {
+                return [
+                    'ok' => true,
+                    'message' => 'Factura electrónica autorizada. CUFE y QR listos en la aplicación.',
+                    'alegra_id' => $factura->alegra_id,
+                    'cufe' => $factura->cufe,
+                ];
             }
-
-            $res = $this->request('post', '/invoices', $payload);
-            $alegraId = (string) ($res['id'] ?? '');
-            $factura->update(['alegra_id' => $alegraId]);
-
-            $this->enviarADian($alegraId);
 
             return [
                 'ok' => true,
-                'message' => 'Factura electrónica causada en Alegra y enviada a la DIAN.',
-                'alegra_id' => $alegraId,
+                'message' => 'Factura causada en Alegra. La DIAN aún no devolvió el CUFE; pulsa otra vez en unos segundos para traer el QR.',
+                'alegra_id' => $factura->alegra_id,
             ];
         } catch (\Throwable $e) {
             return [
@@ -121,6 +127,22 @@ class AlegraService
                     'term' => 'Crédito',
                 ]);
             }
+        } catch (\Throwable $e) {
+            // Puede ya estar abierta.
+        }
+
+        try {
+            $this->request('post', '/invoices/' . $alegraId . '/stamp', [
+                'generateStamp' => true,
+                'generateQrCode' => true,
+            ]);
+
+            return;
+        } catch (\Throwable $e) {
+            // Fallback al endpoint masivo.
+        }
+
+        try {
             $this->request('post', '/invoices/stamp', [
                 'ids' => [(int) $alegraId],
                 'paymentForm' => 'CREDIT',
@@ -128,7 +150,53 @@ class AlegraService
                 'term' => 'Crédito',
             ]);
         } catch (\Throwable $e) {
-            // Queda causada en Alegra aunque el sello DIAN falle; se puede reintentar.
+            // Queda causada; se puede reintentar para el CUFE.
+        }
+    }
+
+    private function esperarYGuardarDian(Factura $factura): void
+    {
+        $alegraId = (string) $factura->alegra_id;
+        if ($alegraId === '') {
+            return;
+        }
+
+        for ($i = 0; $i < 4; $i++) {
+            if ($i > 0) {
+                sleep(2);
+            }
+
+            try {
+                $data = $this->request('get', '/invoices/' . $alegraId);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            $this->guardarDatosDian($factura, $data);
+            $factura->refresh();
+
+            if ($factura->cufe && $factura->qr_code) {
+                return;
+            }
+        }
+    }
+
+    private function guardarDatosDian(Factura $factura, array $data): void
+    {
+        $stamp = is_array($data['stamp'] ?? null) ? $data['stamp'] : [];
+        $numero = $data['numberTemplate']['fullNumber']
+            ?? ((string) ($data['numberTemplate']['prefix'] ?? '') . (string) ($data['numberTemplate']['formattedNumber'] ?? ''));
+
+        $updates = array_filter([
+            'cufe' => $stamp['cufe'] ?? $data['cufe'] ?? $data['uuid'] ?? $factura->cufe,
+            'qr_code' => $stamp['barCodeContent'] ?? $stamp['qrCode'] ?? $data['qrCode'] ?? $data['barCodeContent'] ?? $factura->qr_code,
+            'estado_dian' => $stamp['legalStatus'] ?? $stamp['status'] ?? $data['legalStatus'] ?? $factura->estado_dian,
+            'alegra_numero' => $numero ?: $factura->alegra_numero,
+            'alegra_pdf_url' => $stamp['pdfUrl'] ?? $data['pdfUrl'] ?? $factura->alegra_pdf_url,
+        ], fn ($value) => filled($value));
+
+        if ($updates !== []) {
+            $factura->update($updates);
         }
     }
 

@@ -22,8 +22,15 @@
         @if($factura->cliente->factura_electronica)
         <form action="{{ route('facturas.alegra', $factura) }}" method="POST" class="d-inline">
             @csrf
-            <button type="submit" class="btn btn-outline-primary">
-                <i class="fas fa-file-invoice me-1"></i>{{ $factura->alegra_id ? 'Ya en Alegra' : 'Causar en Alegra' }}
+            <button type="submit" class="btn {{ $factura->cufe ? 'btn-outline-success' : 'btn-outline-primary' }}">
+                <i class="fas fa-file-invoice me-1"></i>
+                @if($factura->cufe)
+                    Actualizar CUFE / QR
+                @elseif($factura->alegra_id)
+                    Traer CUFE y QR
+                @else
+                    Causar en Alegra
+                @endif
             </button>
         </form>
         @endif
@@ -80,6 +87,10 @@
                         </td>
                     </tr>
                     <tr>
+                        <td class="text-muted">N° electrónico:</td>
+                        <td>{{ $factura->alegra_numero ?: '—' }}</td>
+                    </tr>
+                    <tr>
                         <td class="text-muted">Estado:</td>
                         <td>
                             @switch($factura->estado)
@@ -132,6 +143,10 @@
                 </table>
             </div>
         </div>
+    </div>
+
+    <div class="col-12">
+        @include('facturas.partials.electronica')
     </div>
 
     <div class="col-12">

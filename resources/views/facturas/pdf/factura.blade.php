@@ -161,6 +161,20 @@
             color: #0ea5e9;
             margin-bottom: 10px;
         }
+        .dian-box {
+            margin-top: 24px;
+            border: 1px solid #dbe7f0;
+            padding: 12px;
+        }
+        .dian-box img {
+            width: 140px;
+            height: 140px;
+        }
+        .cufe {
+            font-size: 8px;
+            word-break: break-all;
+            font-family: DejaVu Sans, monospace;
+        }
     </style>
 </head>
 <body>
@@ -177,8 +191,11 @@
                 </div>
             </div>
             <div class="header-right">
-                <div class="invoice-title">FACTURA</div>
-                <div class="invoice-number">{{ $factura->numero }}</div>
+                <div class="invoice-title">{{ $factura->cufe ? 'FACTURA ELECTRÓNICA DE VENTA' : 'FACTURA' }}</div>
+                <div class="invoice-number">{{ $factura->numeroMostrar() }}</div>
+                @if($factura->alegra_numero && $factura->alegra_numero !== $factura->numero)
+                <div class="invoice-number">Int. {{ $factura->numero }}</div>
+                @endif
             </div>
         </div>
 
@@ -277,6 +294,30 @@
             <p>• Transferencia bancaria</p>
             <p>• Nequi / Daviplata</p>
         </div>
+
+        @if($factura->cufe || $factura->urlImagenQr())
+        <div class="dian-box">
+            <table width="100%">
+                <tr>
+                    @if($factura->urlImagenQr())
+                    <td width="160" valign="top">
+                        <img src="{{ $factura->urlImagenQr() }}" alt="QR">
+                    </td>
+                    @endif
+                    <td valign="top">
+                        <strong>Factura Electrónica de Venta</strong><br>
+                        @if($factura->estado_dian)
+                        Estado DIAN: {{ $factura->estado_dian }}<br>
+                        @endif
+                        @if($factura->cufe)
+                        <br>CUFE:<br>
+                        <div class="cufe">{{ $factura->cufe }}</div>
+                        @endif
+                    </td>
+                </tr>
+            </table>
+        </div>
+        @endif
 
         <!-- Footer -->
         <div class="footer">

@@ -163,7 +163,8 @@ class FacturaController extends Controller
     {
         $factura->load(['cliente.proyecto', 'servicio.planServicio', 'pagos']);
         
-        $pdf = Pdf::loadView('facturas.pdf.factura', compact('factura'));
+        $pdf = Pdf::loadView('facturas.pdf.factura', compact('factura'))
+            ->setOption('isRemoteEnabled', true);
         
         return $pdf->stream("factura-{$factura->numero}.pdf");
     }
@@ -172,7 +173,8 @@ class FacturaController extends Controller
     {
         $factura->load(['cliente.proyecto', 'servicio.planServicio', 'pagos']);
         
-        $pdf = Pdf::loadView('facturas.pdf.factura', compact('factura'));
+        $pdf = Pdf::loadView('facturas.pdf.factura', compact('factura'))
+            ->setOption('isRemoteEnabled', true);
         
         return $pdf->download("factura-{$factura->numero}.pdf");
     }

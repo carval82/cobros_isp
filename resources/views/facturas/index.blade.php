@@ -80,7 +80,12 @@
                 <tbody>
                     @forelse($facturas as $factura)
                     <tr>
-                        <td><strong>{{ $factura->numero }}</strong></td>
+                        <td>
+                            <strong>{{ $factura->numeroMostrar() }}</strong>
+                            @if($factura->cufe)
+                                <span class="badge bg-primary ms-1">FE</span>
+                            @endif
+                        </td>
                         <td><a href="{{ route('clientes.show', $factura->cliente_id) }}">{{ $factura->cliente->nombre }}</a></td>
                         <td>{{ $factura->periodo }}</td>
                         <td class="text-end">${{ number_format($factura->total, 0, ',', '.') }}</td>

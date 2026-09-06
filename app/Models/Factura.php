@@ -29,6 +29,11 @@ class Factura extends Model
         'notas',
         'token_publico',
         'alegra_id',
+        'cufe',
+        'qr_code',
+        'estado_dian',
+        'alegra_numero',
+        'alegra_pdf_url',
         'enviada_whatsapp_at',
     ];
 
@@ -85,6 +90,35 @@ class Factura extends Model
         return url('/f/' . $this->asegurarTokenPublico());
     }
 
+    public function esElectronica(): bool
+    {
+        return filled($this->cufe) || filled($this->alegra_id);
+    }
+
+    public function numeroMostrar(): string
+    {
+        return $this->alegra_numero ?: $this->numero;
+    }
+
+    public function urlImagenQr(): ?string
+    {
+        if (! $this->qr_code && ! $this->cufe) {
+            return null;
+        }
+
+        $contenido = $this->qr_code ?: $this->cufe;
+
+        if (str_starts_with((string) $contenido, 'http://') || str_starts_with((string) $contenido, 'https://')) {
+            return $contenido;
+        }
+
+        if (str_starts_with((string) $contenido, 'data:image')) {
+            return $contenido;
+        }
+
+        return 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=' . rawurlencode((string) $contenido);
+    }
+
     public function urlWhatsApp(): ?string
     {
         $this->loadMissing('cliente');
@@ -95,7 +129,10 @@ class Factura extends Model
         if (strlen($tel) === 10 && str_starts_with($tel, '3')) {
             $tel = '57' . $tel;
         }
-        $texto = "Hola {$this->cliente->nombre}, te compartimos tu factura {$this->numero} de INTERVEREDANET ({$this->periodo}) por $"
+        $detalle = $this->cufe
+            ? "tu factura electrónica {$this->numeroMostrar()} de INTERVEREDANET ({$this->periodo}) por $"
+            : "tu factura {$this->numeroMostrar()} de INTERVEREDANET ({$this->periodo}) por $";
+        $texto = "Hola {$this->cliente->nombre}, te compartimos {$detalle}"
             . number_format((float) $this->saldo, 0, ',', '.')
             . ". Puedes verla aquí, sin necesidad de iniciar sesión: "
             . $this->urlPublica();
