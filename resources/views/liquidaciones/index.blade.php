@@ -12,6 +12,15 @@
     </a>
 </div>
 
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ route('liquidaciones.index') }}">Cobradores</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ route('liquidaciones.socios') }}">Socios por proyecto</a>
+    </li>
+</ul>
+
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">

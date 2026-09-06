@@ -12,6 +12,9 @@ use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\PagoController;
 use App\Http\Controllers\LiquidacionController;
+use App\Http\Controllers\LiquidacionSocioController;
+use App\Http\Controllers\GastoProyectoController;
+use App\Http\Controllers\ParticipacionProyectoController;
 use App\Http\Controllers\Portal\ClientePortalController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\PublicFacturaController;
@@ -52,6 +55,18 @@ Route::middleware('auth')->group(function () {
     Route::post('facturas/{factura}/whatsapp', [FacturaController::class, 'enviarWhatsapp'])->name('facturas.whatsapp');
     Route::post('facturas/{factura}/alegra', [FacturaController::class, 'causarAlegra'])->name('facturas.alegra');
     Route::post('liquidaciones/{liquidacion}/pagar', [LiquidacionController::class, 'pagar'])->name('liquidaciones.pagar');
+
+    Route::get('liquidaciones-socios', [LiquidacionSocioController::class, 'index'])->name('liquidaciones.socios');
+    Route::get('liquidaciones-socios/{proyecto}', [LiquidacionSocioController::class, 'show'])->name('liquidaciones.socios.show');
+
+    Route::get('gastos', [GastoProyectoController::class, 'index'])->name('gastos.index');
+    Route::post('gastos', [GastoProyectoController::class, 'store'])->name('gastos.store');
+    Route::put('gastos/{gasto}', [GastoProyectoController::class, 'update'])->name('gastos.update');
+    Route::delete('gastos/{gasto}', [GastoProyectoController::class, 'destroy'])->name('gastos.destroy');
+
+    Route::post('proyectos/{proyecto}/socios', [ParticipacionProyectoController::class, 'store'])->name('proyectos.socios.store');
+    Route::put('proyectos/socios/{participacion}', [ParticipacionProyectoController::class, 'update'])->name('proyectos.socios.update');
+    Route::delete('proyectos/socios/{participacion}', [ParticipacionProyectoController::class, 'destroy'])->name('proyectos.socios.destroy');
 
     // Tickets de soporte
     Route::get('tickets', [TicketController::class, 'index'])->name('tickets.index');

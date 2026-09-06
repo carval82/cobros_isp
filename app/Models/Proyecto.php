@@ -43,6 +43,16 @@ class Proyecto extends Model
             ->withTimestamps();
     }
 
+    public function participaciones()
+    {
+        return $this->hasMany(ParticipacionProyecto::class);
+    }
+
+    public function gastos()
+    {
+        return $this->hasMany(GastoProyecto::class);
+    }
+
     public function getTotalClientesAttribute()
     {
         return $this->clientes()->count();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GastoProyecto;
 use App\Models\Proyecto;
 use App\Models\Cliente;
 use App\Models\Factura;
@@ -46,7 +47,9 @@ class ProyectoController extends Controller
     {
         $proyecto->load(['clientes' => function($q) {
             $q->with('servicios.planServicio')->orderBy('nombre');
-        }, 'planes', 'cobradoresAsignados']);
+        }, 'planes', 'cobradoresAsignados', 'participaciones' => function ($q) {
+            $q->orderByDesc('porcentaje');
+        }]);
 
         $estadisticas = [
             'total_clientes' => $proyecto->clientes->count(),
@@ -70,6 +73,10 @@ class ProyectoController extends Controller
             ->whereYear('fecha_pago', $anio)
             ->sum('monto');
         $estadisticas['pendiente_mes'] = $facturasDelMes->sum('saldo');
+        $estadisticas['gastos_mes'] = GastoProyecto::where('proyecto_id', $proyecto->id)
+            ->whereMonth('fecha', $mes)
+            ->whereYear('fecha', $anio)
+            ->sum('monto');
 
         return view('proyectos.show', compact('proyecto', 'estadisticas'));
     }

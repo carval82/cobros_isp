@@ -12,6 +12,9 @@
         <small class="text-muted">{{ $proyecto->codigo }} | {{ $proyecto->ubicacion }}{{ $proyecto->municipio ? ', ' . $proyecto->municipio : '' }}</small>
     </div>
     <div class="btn-group">
+        <a href="{{ route('liquidaciones.socios.show', $proyecto) }}" class="btn btn-success">
+            <i class="fas fa-handshake me-1"></i>Informe socios
+        </a>
         <a href="{{ route('proyectos.edit', $proyecto) }}" class="btn btn-outline-primary">
             <i class="fas fa-edit me-1"></i>Editar
         </a>
@@ -107,15 +110,66 @@
             </div>
             <div class="card-body p-0">
                 <ul class="list-group list-group-flush">
-                    @forelse($proyecto->cobradores as $cobrador)
+                    @forelse($proyecto->cobradoresAsignados as $cobrador)
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         <span>{{ $cobrador->nombre }}</span>
-                        <span class="badge bg-info">{{ $cobrador->comision_porcentaje }}%</span>
+                        <span class="badge bg-info">{{ $cobrador->pivot->comision_porcentaje }}%</span>
                     </li>
                     @empty
                     <li class="list-group-item text-center text-muted">Sin cobradores</li>
                     @endforelse
                 </ul>
+            </div>
+        </div>
+
+        <!-- Socios -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-handshake me-2"></i>Socios</span>
+                <span class="badge bg-{{ abs($proyecto->participaciones->where('activo', true)->sum('porcentaje') - 100) < 0.05 ? 'success' : 'warning' }}">
+                    {{ number_format($proyecto->participaciones->where('activo', true)->sum('porcentaje'), 0) }}%
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    @forelse($proyecto->participaciones as $socio)
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ $socio->socio_nombre }}</strong>
+                                <div class="small text-muted">{{ $socio->socio_documento ?: 'Sin documento' }}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-info">{{ number_format($socio->porcentaje, 0) }}%</span>
+                                <form action="{{ route('proyectos.socios.destroy', $socio) }}" method="POST" onsubmit="return confirm('¿Quitar este socio?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
+                                </form>
+                            </div>
+                        </div>
+                    </li>
+                    @empty
+                    <li class="list-group-item text-center text-muted">Sin socios. Ejemplo: 40% + 40% + 20% o 50% + 50%.</li>
+                    @endforelse
+                </ul>
+            </div>
+            <div class="card-footer">
+                <form action="{{ route('proyectos.socios.store', $proyecto) }}" method="POST" class="row g-2">
+                    @csrf
+                    <div class="col-12">
+                        <input type="text" name="socio_nombre" class="form-control form-control-sm" placeholder="Nombre del socio" required>
+                    </div>
+                    <div class="col-6">
+                        <input type="text" name="socio_documento" class="form-control form-control-sm" placeholder="Documento">
+                    </div>
+                    <div class="col-6">
+                        <input type="number" name="porcentaje" class="form-control form-control-sm" placeholder="%" min="0.01" max="100" step="0.01" required>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-primary w-100">Agregar socio</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

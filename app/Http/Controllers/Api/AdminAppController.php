@@ -14,6 +14,7 @@ use App\Models\Servicio;
 use App\Models\GastoProyecto;
 use App\Models\ParticipacionProyecto;
 use App\Models\Ticket;
+use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -975,88 +976,10 @@ class AdminAppController extends Controller
 
     public function liquidacionProyecto(Request $request, $proyectoId)
     {
-        $mes = $request->mes ?? now()->month;
-        $anio = $request->anio ?? now()->year;
-
+        $mes = (int) ($request->mes ?? now()->month);
+        $anio = (int) ($request->anio ?? now()->year);
         $proyecto = Proyecto::findOrFail($proyectoId);
-
-        // Obtener participaciones
-        $participaciones = ParticipacionProyecto::where('proyecto_id', $proyectoId)
-            ->where('activo', true)
-            ->get();
-
-        // Calcular ingresos del mes (pagos recibidos)
-        $ingresos = Pago::whereHas('factura.servicio.cliente', function($q) use ($proyectoId) {
-            $q->where('proyecto_id', $proyectoId);
-        })
-        ->whereMonth('fecha_pago', $mes)
-        ->whereYear('fecha_pago', $anio)
-        ->get();
-
-        $totalIngresos = $ingresos->sum('monto');
-
-        // Calcular gastos del mes
-        $gastos = GastoProyecto::where('proyecto_id', $proyectoId)
-            ->whereMonth('fecha', $mes)
-            ->whereYear('fecha', $anio)
-            ->get();
-
-        $totalGastos = $gastos->sum('monto');
-
-        // Gastos por categoría
-        $gastosPorCategoria = $gastos->groupBy('categoria')->map(function($items, $categoria) {
-            return [
-                'categoria' => $categoria,
-                'nombre' => GastoProyecto::categorias()[$categoria] ?? $categoria,
-                'total' => $items->sum('monto'),
-                'items' => $items->map(fn($g) => [
-                    'descripcion' => $g->descripcion,
-                    'monto' => $g->monto,
-                    'fecha' => $g->fecha->format('Y-m-d'),
-                    'proveedor' => $g->proveedor,
-                ])->values(),
-            ];
-        })->values();
-
-        // Comisiones de cobradores
-        $comisionesCobradores = Cobrador::where('proyecto_id', $proyectoId)
-            ->where('estado', 'activo')
-            ->get()
-            ->map(function($cobrador) use ($mes, $anio) {
-                $recaudado = Pago::where('cobrador_id', $cobrador->id)
-                    ->whereMonth('fecha_pago', $mes)
-                    ->whereYear('fecha_pago', $anio)
-                    ->sum('monto');
-                
-                $comision = $recaudado * ($cobrador->comision_porcentaje / 100);
-                
-                return [
-                    'cobrador' => $cobrador->nombre,
-                    'recaudado' => $recaudado,
-                    'porcentaje_comision' => $cobrador->comision_porcentaje,
-                    'comision' => $comision,
-                ];
-            });
-
-        $totalComisiones = $comisionesCobradores->sum('comision');
-
-        // Utilidad neta (después de gastos y comisiones)
-        $utilidadBruta = $totalIngresos - $totalGastos;
-        $utilidadNeta = $utilidadBruta - $totalComisiones;
-
-        // Distribución por socio
-        $distribucionSocios = $participaciones->map(function($p) use ($utilidadNeta, $totalGastos, $totalComisiones) {
-            $porcentaje = $p->porcentaje / 100;
-            return [
-                'socio' => $p->socio_nombre,
-                'documento' => $p->socio_documento,
-                'telefono' => $p->socio_telefono,
-                'porcentaje' => $p->porcentaje,
-                'gastos_proporcional' => round($totalGastos * $porcentaje, 2),
-                'comisiones_proporcional' => round($totalComisiones * $porcentaje, 2),
-                'utilidad' => round($utilidadNeta * $porcentaje, 2),
-            ];
-        });
+        $informe = app(LiquidacionProyectoService::class)->calcular($proyecto, $mes, $anio);
 
         return response()->json([
             'success' => true,
@@ -1068,18 +991,38 @@ class AdminAppController extends Controller
             'periodo' => [
                 'mes' => $mes,
                 'anio' => $anio,
-                'nombre_mes' => Carbon::create($anio, $mes, 1)->locale('es')->monthName,
+                'nombre_mes' => $informe['periodo']['nombre'],
             ],
             'resumen' => [
-                'total_ingresos' => $totalIngresos,
-                'total_gastos' => $totalGastos,
-                'total_comisiones' => $totalComisiones,
-                'utilidad_bruta' => $utilidadBruta,
-                'utilidad_neta' => $utilidadNeta,
+                'total_ingresos' => $informe['ingresos'],
+                'total_gastos' => $informe['gastos'],
+                'total_comisiones' => $informe['comisiones'],
+                'utilidad_bruta' => $informe['utilidad'],
+                'utilidad_neta' => $informe['utilidad'],
             ],
-            'detalle_gastos' => $gastosPorCategoria,
-            'detalle_comisiones' => $comisionesCobradores,
-            'distribucion_socios' => $distribucionSocios,
+            'detalle_gastos' => $informe['gastos_por_categoria']->map(function ($cat) {
+                return [
+                    'categoria' => $cat['categoria'],
+                    'nombre' => $cat['nombre'],
+                    'total' => $cat['total'],
+                    'items' => $cat['items']->map(fn ($g) => [
+                        'descripcion' => $g->descripcion,
+                        'monto' => $g->monto,
+                        'fecha' => $g->fecha->format('Y-m-d'),
+                        'proveedor' => $g->proveedor,
+                    ])->values(),
+                ];
+            })->values(),
+            'detalle_comisiones' => $informe['comisiones_detalle'],
+            'distribucion_socios' => $informe['socios']->map(fn ($s) => [
+                'socio' => $s['socio'],
+                'documento' => $s['documento'],
+                'telefono' => $s['telefono'],
+                'porcentaje' => $s['porcentaje'],
+                'gastos_proporcional' => $s['gastos_proporcional'],
+                'comisiones_proporcional' => 0,
+                'utilidad' => $s['liquidacion'],
+            ])->values(),
         ]);
     }
 

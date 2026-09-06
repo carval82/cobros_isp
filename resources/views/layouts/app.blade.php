@@ -214,8 +214,13 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('liquidaciones.*') ? 'active' : '' }}" href="{{ route('liquidaciones.index') }}">
+                <a class="nav-link {{ request()->routeIs('liquidaciones.index') || request()->routeIs('liquidaciones.create') || request()->routeIs('liquidaciones.show') ? 'active' : '' }}" href="{{ route('liquidaciones.index') }}">
                     <i class="fas fa-calculator"></i> Liquidaciones
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('liquidaciones.socios*') || request()->routeIs('gastos.*') ? 'active' : '' }}" href="{{ route('liquidaciones.socios') }}">
+                    <i class="fas fa-handshake"></i> Socios
                 </a>
             </li>
             
