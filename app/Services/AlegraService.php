@@ -70,12 +70,15 @@ class AlegraService
             }
 
             $res = $this->request('post', '/invoices', $payload);
-            $factura->update(['alegra_id' => (string) ($res['id'] ?? '')]);
+            $alegraId = (string) ($res['id'] ?? '');
+            $factura->update(['alegra_id' => $alegraId]);
+
+            $this->enviarADian($alegraId);
 
             return [
                 'ok' => true,
-                'message' => 'Factura electrónica causada en Alegra.',
-                'alegra_id' => $factura->alegra_id,
+                'message' => 'Factura electrónica causada en Alegra y enviada a la DIAN.',
+                'alegra_id' => $alegraId,
             ];
         } catch (\Throwable $e) {
             return [
@@ -107,17 +110,42 @@ class AlegraService
         return $id;
     }
 
+    private function enviarADian(string $alegraId): void
+    {
+        try {
+            $actual = $this->request('get', '/invoices/' . $alegraId);
+            if (($actual['status'] ?? '') !== 'open') {
+                $this->request('put', '/invoices/' . $alegraId . '/open', [
+                    'paymentForm' => 'CREDIT',
+                    'paymentMethod' => 'CREDIT',
+                    'term' => 'Crédito',
+                ]);
+            }
+            $this->request('post', '/invoices/stamp', [
+                'ids' => [(int) $alegraId],
+                'paymentForm' => 'CREDIT',
+                'paymentMethod' => 'CREDIT',
+                'term' => 'Crédito',
+            ]);
+        } catch (\Throwable $e) {
+            // Queda causada en Alegra aunque el sello DIAN falle; se puede reintentar.
+        }
+    }
+
     private function request(string $method, string $path, array $payload = []): array
     {
         $auth = base64_encode(config('alegra.email') . ':' . config('alegra.token'));
         $http = Http::withHeaders([
             'Authorization' => 'Basic ' . $auth,
             'Accept' => 'application/json',
-        ])->timeout(30);
+        ])->timeout(40);
 
-        $res = $method === 'post'
-            ? $http->post('https://api.alegra.com/api/v1' . $path, $payload)
-            : $http->get('https://api.alegra.com/api/v1' . $path, $payload);
+        $url = 'https://api.alegra.com/api/v1' . $path;
+        $res = match ($method) {
+            'post' => $http->post($url, $payload),
+            'put' => $http->put($url, $payload),
+            default => $http->get($url, $payload),
+        };
 
         if (! $res->successful()) {
             $detail = $res->json('message') ?? $res->json('error') ?? $res->body();
