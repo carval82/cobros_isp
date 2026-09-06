@@ -38,6 +38,9 @@
                             @else
                                 <span class="badge bg-secondary">Cliente antiguo</span>
                             @endif
+                            <div class="small mt-2">
+                                <a href="{{ route('clientes.edit', $cliente) }}">Si te equivocaste, corrige el tipo de alta</a>
+                            </div>
                         </td>
                     </tr>
                     <tr>

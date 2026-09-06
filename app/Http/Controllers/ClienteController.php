@@ -116,7 +116,21 @@ class ClienteController extends Controller
     {
         $cobradores = Cobrador::where('estado', 'activo')->orderBy('nombre')->get();
         $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
-        return view('clientes.edit', compact('cliente', 'cobradores', 'proyectos'));
+        $facturacion = app(FacturacionService::class);
+        $fechaAlta = $cliente->fecha_instalacion
+            ? \Carbon\Carbon::parse($cliente->fecha_instalacion)
+            : ($cliente->created_at ?? now());
+        $periodoNuevo = $facturacion->calcularPrimerPeriodo('nuevo', $fechaAlta);
+        $periodoAntiguo = $facturacion->calcularPrimerPeriodo('antiguo', $fechaAlta);
+
+        return view('clientes.edit', compact(
+            'cliente',
+            'cobradores',
+            'proyectos',
+            'facturacion',
+            'periodoNuevo',
+            'periodoAntiguo'
+        ));
     }
 
     public function update(Request $request, Cliente $cliente)
@@ -138,12 +152,21 @@ class ClienteController extends Controller
             'notas' => 'nullable|string',
             'cobrador_id' => 'nullable|exists:cobradors,id',
             'proyecto_id' => 'nullable|exists:proyectos,id',
+            'tipo_alta' => 'required|in:nuevo,antiguo',
         ]);
 
+        $tipoAlta = $validated['tipo_alta'];
+        unset($validated['tipo_alta']);
         $cliente->update($validated);
 
+        $mensaje = 'Cliente actualizado correctamente.';
+        if ($tipoAlta !== $cliente->tipo_alta) {
+            $resultado = app(FacturacionService::class)->corregirTipoAlta($cliente->fresh(), $tipoAlta);
+            $mensaje = $resultado['mensaje'];
+        }
+
         return redirect()->route('clientes.show', $cliente)
-            ->with('success', 'Cliente actualizado correctamente');
+            ->with('success', $mensaje);
     }
 
     public function destroy(Cliente $cliente)

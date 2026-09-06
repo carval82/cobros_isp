@@ -19,6 +19,26 @@
             @method('PUT')
             
             <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Tipo de alta</label>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="border rounded p-3 d-block h-100 {{ old('tipo_alta', $cliente->tipo_alta) == 'nuevo' ? 'border-success' : '' }}" style="cursor:pointer">
+                                <input type="radio" name="tipo_alta" value="nuevo" class="form-check-input me-2" {{ old('tipo_alta', $cliente->tipo_alta) == 'nuevo' ? 'checked' : '' }} required>
+                                <strong>Cliente nuevo</strong>
+                                <div class="small text-muted mt-1">Mes libre. Primera factura: {{ $facturacion->etiquetaPeriodo($periodoNuevo['mes'], $periodoNuevo['anio']) }}. Si te equivocaste, cámbialo aquí y se quita la factura de este mes (si no tiene pagos).</div>
+                            </label>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="border rounded p-3 d-block h-100 {{ old('tipo_alta', $cliente->tipo_alta) == 'antiguo' ? 'border-primary' : '' }}" style="cursor:pointer">
+                                <input type="radio" name="tipo_alta" value="antiguo" class="form-check-input me-2" {{ old('tipo_alta', $cliente->tipo_alta) == 'antiguo' ? 'checked' : '' }}>
+                                <strong>Cliente antiguo</strong>
+                                <div class="small text-muted mt-1">Ya venía del servicio. Primera factura: {{ $facturacion->etiquetaPeriodo($periodoAntiguo['mes'], $periodoAntiguo['anio']) }}. Si lo marcas, se crea la factura del mes en curso.</div>
+                            </label>
+                        </div>
+                    </div>
+                    @error('tipo_alta')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                </div>
                 <div class="col-md-4">
                     <label class="form-label">Proyecto *</label>
                     <select name="proyecto_id" class="form-select">

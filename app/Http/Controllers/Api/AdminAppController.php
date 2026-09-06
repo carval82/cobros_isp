@@ -170,6 +170,9 @@ class AdminAppController extends Controller
                     'celular' => $c->celular,
                     'direccion' => $c->direccion,
                     'estado' => $c->estado,
+                    'tipo_alta' => $c->tipo_alta,
+                    'primera_factura' => $c->etiquetaPrimeraFactura(),
+                    'proyecto_id' => $c->proyecto_id,
                     'proyecto' => $c->proyecto?->nombre,
                     'cobrador' => $c->cobrador?->nombre,
                 ];
@@ -255,14 +258,25 @@ class AdminAppController extends Controller
             'direccion' => 'nullable|string|max:255',
             'estado' => 'sometimes|in:activo,suspendido,retirado',
             'cobrador_id' => 'nullable|exists:cobradors,id',
+            'tipo_alta' => 'sometimes|in:nuevo,antiguo',
         ]);
 
-        $cliente->update($request->all());
+        $tipoAlta = $request->input('tipo_alta');
+        $cliente->update($request->except(['tipo_alta']));
+
+        $mensaje = 'Cliente actualizado exitosamente';
+        $primeraFactura = $cliente->fresh()->etiquetaPrimeraFactura();
+        if ($tipoAlta && $tipoAlta !== $cliente->tipo_alta) {
+            $resultado = app(\App\Services\FacturacionService::class)->corregirTipoAlta($cliente->fresh(), $tipoAlta);
+            $mensaje = $resultado['mensaje'];
+            $primeraFactura = $resultado['primera_factura'];
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Cliente actualizado exitosamente',
-            'cliente' => $cliente,
+            'message' => $mensaje,
+            'cliente' => $cliente->fresh(),
+            'primera_factura' => $primeraFactura,
         ]);
     }
 
