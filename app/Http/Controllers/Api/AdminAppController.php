@@ -51,29 +51,146 @@ class AdminAppController extends Controller
         ]);
     }
 
+    public function perfil(Request $request)
+    {
+        return response()->json([
+            'success' => true,
+            'user' => $this->formatUsuario($request->user()),
+        ]);
+    }
+
     public function updatePerfil(Request $request)
     {
         $user = $request->user();
-        
+
         $request->validate([
             'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
+            'password' => 'nullable|string|min:6',
+            'password_actual' => 'required_with:password|string',
+        ], [
+            'email.unique' => 'Este correo ya está en uso',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
+            'password_actual.required_with' => 'Ingrese la contraseña actual',
         ]);
+
+        if ($request->filled('password')) {
+            if (!Hash::check($request->password_actual, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La contraseña actual es incorrecta',
+                ], 422);
+            }
+            $user->password = $request->password;
+        }
 
         if ($request->has('name')) {
             $user->name = $request->name;
         }
-        
+
+        if ($request->has('email')) {
+            $user->email = $request->email;
+        }
+
         $user->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Perfil actualizado',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ],
+            'user' => $this->formatUsuario($user),
         ]);
+    }
+
+    public function usuarios()
+    {
+        $usuarios = User::orderBy('name')
+            ->get()
+            ->map(fn (User $usuario) => $this->formatUsuario($usuario));
+
+        return response()->json([
+            'success' => true,
+            'usuarios' => $usuarios,
+        ]);
+    }
+
+    public function storeUsuario(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6',
+        ], [
+            'email.unique' => 'Este correo ya está en uso',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
+        ]);
+
+        $usuario = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => $request->password,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Usuario creado exitosamente',
+            'usuario' => $this->formatUsuario($usuario),
+        ]);
+    }
+
+    public function updateUsuario(Request $request, $id)
+    {
+        $usuario = User::findOrFail($id);
+
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|max:255|unique:users,email,' . $usuario->id,
+            'password' => 'nullable|string|min:6',
+        ], [
+            'email.unique' => 'Este correo ya está en uso',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
+        ]);
+
+        $data = $request->only(['name', 'email']);
+        if ($request->filled('password')) {
+            $data['password'] = $request->password;
+        }
+
+        $usuario->update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Usuario actualizado exitosamente',
+            'usuario' => $this->formatUsuario($usuario->fresh()),
+        ]);
+    }
+
+    public function deleteUsuario(Request $request, $id)
+    {
+        if ((int) $id === (int) $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No puede eliminar su propio usuario',
+            ], 422);
+        }
+
+        $usuario = User::findOrFail($id);
+        $usuario->tokens()->delete();
+        $usuario->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Usuario eliminado exitosamente',
+        ]);
+    }
+
+    private function formatUsuario(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'created_at' => $user->created_at?->toDateTimeString(),
+        ];
     }
 
     public function dashboard(Request $request)
