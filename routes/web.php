@@ -18,6 +18,7 @@ use App\Http\Controllers\ParticipacionProyectoController;
 use App\Http\Controllers\Portal\ClientePortalController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\PublicFacturaController;
+use App\Http\Controllers\UsuarioController;
 
 // Autenticación
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
@@ -74,6 +75,12 @@ Route::middleware('auth')->group(function () {
     Route::get('tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
     Route::post('tickets/{ticket}/responder', [TicketController::class, 'responder'])->name('tickets.responder');
     Route::post('tickets/{ticket}/estado', [TicketController::class, 'cambiarEstado'])->name('tickets.estado');
+
+    // Perfil y usuarios admin
+    Route::get('perfil', [UsuarioController::class, 'perfil'])->name('perfil.edit');
+    Route::put('perfil', [UsuarioController::class, 'actualizarPerfil'])->name('perfil.update');
+    Route::put('perfil/password', [UsuarioController::class, 'cambiarPassword'])->name('perfil.password');
+    Route::resource('usuarios', UsuarioController::class)->except(['show']);
 });
 
 // API para la app móvil (sin autenticación web)
