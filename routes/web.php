@@ -60,6 +60,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('liquidaciones-socios', [LiquidacionSocioController::class, 'index'])->name('liquidaciones.socios');
     Route::get('liquidaciones-socios/{proyecto}', [LiquidacionSocioController::class, 'show'])->name('liquidaciones.socios.show');
+    Route::get('liquidaciones-informe', [LiquidacionController::class, 'informeMensual'])->name('liquidaciones.informe');
+    Route::get('liquidaciones-informe/{cobrador}', [LiquidacionController::class, 'informeCobrador'])->name('liquidaciones.informe.cobrador');
+    Route::post('liquidaciones-informe/generar', [LiquidacionController::class, 'generarMensual'])->name('liquidaciones.informe.generar');
+    Route::post('liquidaciones-informe/generar-todos', [LiquidacionController::class, 'generarMensualTodos'])->name('liquidaciones.informe.generar-todos');
 
     Route::get('gastos', [GastoProyectoController::class, 'index'])->name('gastos.index');
     Route::post('gastos', [GastoProyectoController::class, 'store'])->name('gastos.store');

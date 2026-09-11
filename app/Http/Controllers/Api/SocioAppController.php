@@ -126,15 +126,29 @@ class SocioAppController extends Controller
         ->whereYear('fecha_pago', $anio)
         ->sum('monto');
 
-        // Calcular gastos del mes
-        $gastos = GastoProyecto::where('proyecto_id', $proyecto_id)
+        $gastosList = GastoProyecto::where('proyecto_id', $proyecto_id)
             ->whereMonth('fecha', $mes)
             ->whereYear('fecha', $anio)
-            ->sum('monto');
+            ->orderBy('fecha')
+            ->get();
+
+        $gastos = $gastosList->sum('monto');
+        $gastosDetalle = $gastosList->map(function ($g) {
+            return [
+                'id' => $g->id,
+                'fecha' => $g->fecha?->format('d/m/Y'),
+                'categoria' => $g->categoria,
+                'categoria_nombre' => GastoProyecto::categorias()[$g->categoria] ?? $g->categoria,
+                'descripcion' => $g->descripcion,
+                'proveedor' => $g->proveedor,
+                'monto' => (float) $g->monto,
+            ];
+        });
 
         // Calcular utilidad y participación
         $utilidad = $ingresos - $gastos;
         $miParticipacion = $utilidad * ($participacion->porcentaje / 100);
+        $miGasto = $gastos * ($participacion->porcentaje / 100);
 
         // Obtener historial de los últimos 6 meses
         $historial = [];
@@ -184,11 +198,13 @@ class SocioAppController extends Controller
                     'anio' => $anio,
                 ],
                 'resumen' => [
-                    'ingresos' => $ingresos,
-                    'gastos' => $gastos,
-                    'utilidad' => $utilidad,
-                    'mi_participacion' => $miParticipacion,
+                    'ingresos' => (float) $ingresos,
+                    'gastos' => (float) $gastos,
+                    'utilidad' => (float) $utilidad,
+                    'mi_participacion' => (float) $miParticipacion,
+                    'mi_gasto' => (float) $miGasto,
                 ],
+                'gastos_detalle' => $gastosDetalle,
                 'historial' => $historial,
             ],
         ]);

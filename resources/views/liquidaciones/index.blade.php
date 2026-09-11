@@ -17,6 +17,9 @@
         <a class="nav-link active" href="{{ route('liquidaciones.index') }}">Cobradores</a>
     </li>
     <li class="nav-item">
+        <a class="nav-link" href="{{ route('liquidaciones.informe') }}">Proyección e informe</a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link" href="{{ route('liquidaciones.socios') }}">Socios por proyecto</a>
     </li>
 </ul>

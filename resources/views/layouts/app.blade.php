@@ -214,8 +214,13 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('liquidaciones.index') || request()->routeIs('liquidaciones.create') || request()->routeIs('liquidaciones.show') ? 'active' : '' }}" href="{{ route('liquidaciones.index') }}">
+                <a class="nav-link {{ request()->routeIs('liquidaciones.index') || request()->routeIs('liquidaciones.create') || request()->routeIs('liquidaciones.show') || request()->routeIs('liquidaciones.informe*') ? 'active' : '' }}" href="{{ route('liquidaciones.informe') }}">
                     <i class="fas fa-calculator"></i> Liquidaciones
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('tickets.*') ? 'active' : '' }}" href="{{ route('tickets.index') }}">
+                    <i class="fas fa-headset"></i> Ayuda / Tickets
                 </a>
             </li>
             <li class="nav-item">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Liquidacion;
 use App\Models\Cobrador;
 use App\Models\Cobro;
+use App\Services\CobradorInformeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -144,5 +145,79 @@ class LiquidacionController extends Controller
 
         return redirect()->route('liquidaciones.show', $liquidacion)
             ->with('success', 'Liquidación marcada como pagada');
+    }
+
+    public function informeMensual(Request $request, CobradorInformeService $service)
+    {
+        $mes = (int) $request->get('mes', now()->month);
+        $anio = (int) $request->get('anio', now()->year);
+        $informe = $service->informeMensual($mes, $anio);
+        $meses = CobradorInformeService::meses();
+
+        return view('liquidaciones.informe-mensual', compact('informe', 'meses', 'mes', 'anio'));
+    }
+
+    public function informeCobrador(Request $request, Cobrador $cobrador, CobradorInformeService $service)
+    {
+        $mes = (int) $request->get('mes', now()->month);
+        $anio = (int) $request->get('anio', now()->year);
+        $detalle = $service->detalleCobrador($cobrador, $mes, $anio);
+
+        return view('liquidaciones.informe-cobrador', compact('detalle', 'cobrador'));
+    }
+
+    public function generarMensual(Request $request, CobradorInformeService $service)
+    {
+        $validated = $request->validate([
+            'cobrador_id' => 'required|exists:cobradors,id',
+            'mes' => 'required|integer|min:1|max:12',
+            'anio' => 'required|integer|min:2020',
+        ]);
+
+        $cobrador = Cobrador::findOrFail($validated['cobrador_id']);
+        $liquidacion = $service->generarLiquidacion(
+            $cobrador,
+            (int) $validated['mes'],
+            (int) $validated['anio'],
+            auth()->id()
+        );
+
+        return redirect()->route('liquidaciones.show', $liquidacion)
+            ->with('success', 'Informe mensual y liquidación listos para ' . $cobrador->nombre);
+    }
+
+    public function generarMensualTodos(Request $request, CobradorInformeService $service)
+    {
+        $validated = $request->validate([
+            'mes' => 'required|integer|min:1|max:12',
+            'anio' => 'required|integer|min:2020',
+        ]);
+
+        $cobradores = Cobrador::where('estado', 'activo')->get();
+        $generadas = 0;
+
+        foreach ($cobradores as $cobrador) {
+            $antes = Liquidacion::where('cobrador_id', $cobrador->id)
+                ->whereMonth('fecha_desde', $validated['mes'])
+                ->whereYear('fecha_desde', $validated['anio'])
+                ->where('estado', '!=', 'anulada')
+                ->exists();
+
+            $service->generarLiquidacion(
+                $cobrador,
+                (int) $validated['mes'],
+                (int) $validated['anio'],
+                auth()->id()
+            );
+
+            if (! $antes) {
+                $generadas++;
+            }
+        }
+
+        return redirect()->route('liquidaciones.informe', [
+            'mes' => $validated['mes'],
+            'anio' => $validated['anio'],
+        ])->with('success', "Se generaron {$generadas} liquidaciones del mes. Si ya existían, se respetaron.");
     }
 }
