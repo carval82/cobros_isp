@@ -23,6 +23,13 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            $user = Auth::user();
+            if (! $user->canUseAdminPanel()) {
+                Auth::logout();
+                return back()->withErrors([
+                    'email' => 'Este usuario entra por la app como ' . $user->etiquetaRol() . ', no por el panel web.',
+                ])->onlyInput('email');
+            }
             $request->session()->regenerate();
             return redirect()->intended(route('dashboard'));
         }

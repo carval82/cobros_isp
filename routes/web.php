@@ -84,7 +84,7 @@ Route::middleware('auth')->group(function () {
     Route::get('perfil', [UsuarioController::class, 'perfil'])->name('perfil.edit');
     Route::put('perfil', [UsuarioController::class, 'actualizarPerfil'])->name('perfil.update');
     Route::put('perfil/password', [UsuarioController::class, 'cambiarPassword'])->name('perfil.password');
-    Route::resource('usuarios', UsuarioController::class)->except(['show']);
+    Route::resource('usuarios', UsuarioController::class)->except(['show'])->middleware('admin.role');
 });
 
 // API para la app móvil (sin autenticación web)

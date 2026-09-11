@@ -20,6 +20,7 @@
                     <tr>
                         <th>Nombre</th>
                         <th>Correo</th>
+                        <th>Rol</th>
                         <th>Creado</th>
                         <th class="text-center">Acciones</th>
                     </tr>
@@ -34,6 +35,21 @@
                             @endif
                         </td>
                         <td>{{ $usuario->email }}</td>
+                        <td>
+                            @php
+                                $rolColor = match($usuario->role) {
+                                    'admin' => 'danger',
+                                    'oficina' => 'info',
+                                    'cobrador' => 'success',
+                                    'socio' => 'warning',
+                                    default => 'secondary',
+                                };
+                            @endphp
+                            <span class="badge bg-{{ $rolColor }}">{{ $usuario->etiquetaRol() }}</span>
+                            @if($usuario->documento)
+                                <div class="small text-muted">{{ $usuario->documento }}</div>
+                            @endif
+                        </td>
                         <td>{{ $usuario->created_at?->format('d/m/Y') }}</td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
@@ -54,7 +70,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-muted">
+                        <td colspan="5" class="text-center py-4 text-muted">
                             <i class="fas fa-users-cog fa-2x mb-2 d-block"></i>
                             No hay usuarios registrados
                         </td>

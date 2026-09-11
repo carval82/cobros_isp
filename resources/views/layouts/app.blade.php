@@ -229,12 +229,14 @@
                 </a>
             </li>
             
+            @if(Auth::user()?->isAdmin())
             <li class="nav-item mt-4 border-top border-secondary pt-3">
                 <a class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}" href="{{ route('usuarios.index') }}">
                     <i class="fas fa-users-cog"></i> Usuarios
                 </a>
             </li>
-            <li class="nav-item">
+            @endif
+            <li class="nav-item {{ Auth::user()?->isAdmin() ? '' : 'mt-4 border-top border-secondary pt-3' }}">
                 <a class="nav-link {{ request()->routeIs('perfil.*') ? 'active' : '' }}" href="{{ route('perfil.edit') }}">
                     <i class="fas fa-user-circle"></i> {{ Auth::user()->name ?? 'Mi perfil' }}
                 </a>

@@ -18,6 +18,7 @@ use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class AdminAppController extends Controller
@@ -38,15 +39,18 @@ class AdminAppController extends Controller
             ], 401);
         }
 
+        if (! $user->canUseAdminPanel()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Este usuario entra a la app como ' . $user->etiquetaRol() . ', no como admin.',
+            ], 401);
+        }
+
         $token = $user->createToken('admin-app')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ],
+            'user' => $this->formatUsuario($user),
             'token' => $token,
         ]);
     }
@@ -103,7 +107,10 @@ class AdminAppController extends Controller
 
     public function usuarios()
     {
-        $usuarios = User::orderBy('name')
+        $this->assertAdmin(request());
+
+        $usuarios = User::with('cobrador.proyectos')
+            ->orderBy('name')
             ->get()
             ->map(fn (User $usuario) => $this->formatUsuario($usuario));
 
@@ -115,20 +122,9 @@ class AdminAppController extends Controller
 
     public function storeUsuario(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
-            'password' => 'required|string|min:6',
-        ], [
-            'email.unique' => 'Este correo ya está en uso',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
-        ]);
-
-        $usuario = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => $request->password,
-        ]);
+        $this->assertAdmin($request);
+        $data = $this->validatedUsuario($request, true);
+        $usuario = app(\App\Services\UsuarioAppService::class)->crear($data);
 
         return response()->json([
             'success' => true,
@@ -139,33 +135,21 @@ class AdminAppController extends Controller
 
     public function updateUsuario(Request $request, $id)
     {
+        $this->assertAdmin($request);
         $usuario = User::findOrFail($id);
-
-        $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|max:255|unique:users,email,' . $usuario->id,
-            'password' => 'nullable|string|min:6',
-        ], [
-            'email.unique' => 'Este correo ya está en uso',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
-        ]);
-
-        $data = $request->only(['name', 'email']);
-        if ($request->filled('password')) {
-            $data['password'] = $request->password;
-        }
-
-        $usuario->update($data);
+        $data = $this->validatedUsuario($request, false, $usuario);
+        $usuario = app(\App\Services\UsuarioAppService::class)->actualizar($usuario, $data);
 
         return response()->json([
             'success' => true,
             'message' => 'Usuario actualizado exitosamente',
-            'usuario' => $this->formatUsuario($usuario->fresh()),
+            'usuario' => $this->formatUsuario($usuario),
         ]);
     }
 
     public function deleteUsuario(Request $request, $id)
     {
+        $this->assertAdmin($request);
         if ((int) $id === (int) $request->user()->id) {
             return response()->json([
                 'success' => false,
@@ -174,6 +158,12 @@ class AdminAppController extends Controller
         }
 
         $usuario = User::findOrFail($id);
+        if ($usuario->isAdmin() && User::where('role', 'admin')->where('id', '!=', $usuario->id)->count() === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe quedar al menos un administrador',
+            ], 422);
+        }
         $usuario->tokens()->delete();
         $usuario->delete();
 
@@ -185,10 +175,25 @@ class AdminAppController extends Controller
 
     private function formatUsuario(User $user): array
     {
+        $user->loadMissing('cobrador.proyectos');
+        $cobrador = $user->cobrador;
+        $participacion = $user->documento
+            ? ParticipacionProyecto::where('socio_documento', $user->documento)->first()
+            : null;
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'role' => $user->role ?? 'admin',
+            'role_label' => $user->etiquetaRol(),
+            'documento' => $user->documento ?? $cobrador?->documento,
+            'celular' => $cobrador?->celular,
+            'comision_porcentaje' => $cobrador?->comision_porcentaje,
+            'proyectos' => $cobrador?->proyectos?->pluck('id')->values() ?? [],
+            'telefono' => $participacion?->socio_telefono,
+            'proyecto_id' => $participacion?->proyecto_id,
+            'porcentaje' => $participacion?->porcentaje,
             'created_at' => $user->created_at?->toDateTimeString(),
         ];
     }
@@ -1254,6 +1259,62 @@ class AdminAppController extends Controller
             'cobradores' => $cobradores,
             'planes' => $planes,
             'categorias_gastos' => GastoProyecto::categorias(),
+            'roles' => collect(User::rolesApp())->map(fn ($label, $id) => [
+                'id' => $id,
+                'nombre' => $label,
+            ])->values(),
+        ]);
+    }
+
+    private function assertAdmin(Request $request): void
+    {
+        if (! $request->user()?->isAdmin()) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'Solo el administrador puede gestionar usuarios.',
+            ], 403));
+        }
+    }
+
+    private function validatedUsuario(Request $request, bool $creating, ?User $usuario = null): array
+    {
+        $usuario?->loadMissing('cobrador');
+        $role = $request->input('role', $usuario?->role ?? 'oficina');
+        $passwordRule = $creating && in_array($role, ['admin', 'oficina'], true)
+            ? 'required|string|min:6'
+            : 'nullable|string|min:6';
+
+        $documentoRules = [
+            in_array($role, ['cobrador', 'socio'], true) ? 'required' : 'nullable',
+            'string',
+            'max:20',
+            Rule::unique('users', 'documento')->ignore($usuario?->id),
+        ];
+        if ($role === 'cobrador') {
+            $documentoRules[] = Rule::unique('cobradors', 'documento')->ignore($usuario?->cobrador?->id)->whereNull('deleted_at');
+        }
+
+        return $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
+            'role' => 'required|in:' . implode(',', array_keys(User::rolesApp())),
+            'password' => $passwordRule,
+            'documento' => $documentoRules,
+            'pin' => $role === 'cobrador' && $creating ? 'required|string|min:4|max:6' : 'nullable|string|min:4|max:6',
+            'celular' => 'nullable|string|max:20',
+            'telefono' => 'nullable|string|max:20',
+            'comision_porcentaje' => 'nullable|numeric|min:0|max:100',
+            'proyectos' => 'nullable|array',
+            'proyectos.*' => 'exists:proyectos,id',
+            'proyecto_id' => $role === 'socio' && $creating ? 'required|exists:proyectos,id' : 'nullable|exists:proyectos,id',
+            'porcentaje' => 'nullable|numeric|min:0|max:100',
+        ], [
+            'email.unique' => 'Este correo ya está en uso',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
+            'documento.required' => 'El documento es obligatorio para este rol',
+            'documento.unique' => 'Este documento ya está en uso',
+            'pin.required' => 'El PIN es obligatorio para el cobrador',
+            'proyecto_id.required' => 'Asigna un proyecto al socio',
         ]);
     }
 }

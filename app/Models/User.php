@@ -18,10 +18,16 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
+    protected $attributes = [
+        'role' => 'admin',
+    ];
+
     protected $fillable = [
         'name',
         'email',
         'password',
+        'role',
+        'documento',
     ];
 
     /**
@@ -45,5 +51,37 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public static function rolesApp(): array
+    {
+        return [
+            'admin' => 'Administrador',
+            'oficina' => 'Oficina',
+            'cobrador' => 'Cobrador',
+            'socio' => 'Socio',
+        ];
+    }
+
+    public function etiquetaRol(): string
+    {
+        $role = $this->role ?: 'admin';
+
+        return self::rolesApp()[$role] ?? $role;
+    }
+
+    public function isAdmin(): bool
+    {
+        return ($this->role ?: 'admin') === 'admin';
+    }
+
+    public function canUseAdminPanel(): bool
+    {
+        return in_array($this->role ?: 'admin', ['admin', 'oficina'], true);
+    }
+
+    public function cobrador(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Cobrador::class);
     }
 }

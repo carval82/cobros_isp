@@ -7,9 +7,11 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-user-circle me-2"></i>Mi perfil
     </h1>
+    @if(Auth::user()?->isAdmin())
     <a href="{{ route('usuarios.index') }}" class="btn btn-outline-primary">
         <i class="fas fa-users-cog me-1"></i>Gestionar usuarios
     </a>
+    @endif
 </div>
 
 <div class="row g-4">

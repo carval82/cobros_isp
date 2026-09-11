@@ -114,8 +114,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin - Perfil y usuarios
     Route::get('/admin/perfil', [AdminAppController::class, 'perfil']);
     Route::put('/admin/perfil', [AdminAppController::class, 'updatePerfil']);
-    Route::get('/admin/usuarios', [AdminAppController::class, 'usuarios']);
-    Route::post('/admin/usuarios', [AdminAppController::class, 'storeUsuario']);
-    Route::put('/admin/usuarios/{id}', [AdminAppController::class, 'updateUsuario']);
-    Route::delete('/admin/usuarios/{id}', [AdminAppController::class, 'deleteUsuario']);
+    Route::middleware('admin.role')->group(function () {
+        Route::get('/admin/usuarios', [AdminAppController::class, 'usuarios']);
+        Route::post('/admin/usuarios', [AdminAppController::class, 'storeUsuario']);
+        Route::put('/admin/usuarios/{id}', [AdminAppController::class, 'updateUsuario']);
+        Route::delete('/admin/usuarios/{id}', [AdminAppController::class, 'deleteUsuario']);
+    });
 });
