@@ -79,13 +79,13 @@ class ClienteAppController extends Controller
 
     public function cuenta(Request $request)
     {
-        $cliente = $request->user();
-        
+        $cliente = $this->clienteAuth($request);
         $cliente->load(['proyecto', 'servicios.planServicio']);
+        $servicio = $cliente->servicios->first();
 
-        $facturasPendientes = Factura::whereHas('servicio', function($q) use ($cliente) {
-            $q->where('cliente_id', $cliente->id);
-        })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->sum('saldo');
+        $facturasPendientes = $cliente->facturas()
+            ->whereIn('estado', ['pendiente', 'parcial', 'vencida'])
+            ->sum('saldo');
 
         return response()->json([
             'success' => true,
@@ -100,12 +100,12 @@ class ClienteAppController extends Controller
                     'barrio' => $cliente->barrio,
                     'proyecto' => $cliente->proyecto?->nombre,
                 ],
-                'servicio' => $cliente->servicios->first() ? [
-                    'plan' => $cliente->servicios->first()->planServicio->nombre ?? 'Sin plan',
-                    'precio' => $cliente->servicios->first()->precio_mensual,
-                    'estado' => $cliente->servicios->first()->estado,
+                'servicio' => $servicio ? [
+                    'plan' => $servicio->planServicio?->nombre ?? 'Sin plan',
+                    'precio' => (float) $servicio->precio_mensual,
+                    'estado' => $servicio->estado,
                 ] : null,
-                'saldo_pendiente' => $facturasPendientes,
+                'saldo_pendiente' => (float) $facturasPendientes,
             ],
         ]);
     }
@@ -153,10 +153,10 @@ class ClienteAppController extends Controller
         ->map(function($p) {
             return [
                 'id' => $p->id,
-                'monto' => $p->monto,
-                'fecha_pago' => $p->fecha_pago->format('Y-m-d'),
+                'monto' => (float) $p->monto,
+                'fecha_pago' => optional($p->fecha_pago)->format('Y-m-d'),
                 'metodo_pago' => $p->metodo_pago,
-                'factura_periodo' => $p->factura->periodo,
+                'factura_periodo' => $p->factura?->periodo,
             ];
         });
 
@@ -206,7 +206,7 @@ class ClienteAppController extends Controller
 
     public function getFacturas(Request $request)
     {
-        $cliente = $request->user();
+        $cliente = $this->clienteAuth($request);
 
         $facturas = $cliente->facturas()
             ->with('pagos')
@@ -219,14 +219,14 @@ class ClienteAppController extends Controller
                     'id' => $f->id,
                     'numero' => $f->numero,
                     'periodo' => $f->periodo,
-                    'total' => $f->total,
-                    'saldo' => $f->saldo,
+                    'total' => (float) $f->total,
+                    'saldo' => (float) $f->saldo,
                     'estado' => $f->estado,
-                    'fecha_vencimiento' => $f->fecha_vencimiento->format('d/m/Y'),
+                    'fecha_vencimiento' => optional($f->fecha_vencimiento)->format('d/m/Y'),
                     'pagos' => $f->pagos->map(function($p) {
                         return [
-                            'monto' => $p->monto,
-                            'fecha_pago' => $p->fecha_pago->format('d/m/Y'),
+                            'monto' => (float) $p->monto,
+                            'fecha_pago' => optional($p->fecha_pago)->format('d/m/Y'),
                             'metodo_pago' => $p->metodo_pago,
                         ];
                     }),
@@ -235,6 +235,7 @@ class ClienteAppController extends Controller
 
         return response()->json([
             'success' => true,
+            'facturas' => $facturas,
             'data' => $facturas,
         ]);
     }
@@ -390,5 +391,18 @@ class ClienteAppController extends Controller
             'success' => true,
             'message' => 'PIN actualizado correctamente',
         ]);
+    }
+
+    private function clienteAuth(Request $request): Cliente
+    {
+        $user = $request->user();
+        if ($user instanceof Cliente) {
+            return $user;
+        }
+
+        abort(response()->json([
+            'success' => false,
+            'message' => 'Sesión de cliente inválida. Vuelve a entrar.',
+        ], 401));
     }
 }
