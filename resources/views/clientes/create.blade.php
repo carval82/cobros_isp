@@ -7,7 +7,7 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-user-plus me-2"></i>Nuevo Cliente
     </h1>
-    <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary">
+    <a href="{{ list_back(route('clientes.index')) }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left me-1"></i>Volver
     </a>
 </div>
@@ -16,6 +16,7 @@
     <div class="card-body">
         <form action="{{ route('clientes.store') }}" method="POST">
             @csrf
+            @include('partials.return-field')
             
             <div class="row g-3">
                 <div class="col-12">
@@ -132,7 +133,7 @@
             <hr>
             
             <div class="d-flex justify-content-end gap-2">
-                <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+                <a href="{{ list_back(route('clientes.index')) }}" class="btn btn-outline-secondary">Cancelar</a>
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-save me-1"></i>Guardar Cliente
                 </button>

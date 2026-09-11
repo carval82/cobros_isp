@@ -70,58 +70,52 @@ class CobradorAppController extends Controller
     public function proyectos(Request $request)
     {
         $cobrador = $request->user();
-        
-        // Obtener proyectos de la tabla pivot
-        $proyectos = $cobrador->proyectos()
-            ->withCount(['clientes' => function($q) {
-                $q->where('estado', 'activo');
-            }])
-            ->get()
-            ->map(function($proyecto) use ($cobrador) {
-                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto) {
-                    $q->where('proyecto_id', $proyecto->id)
-                      ->where('estado', 'activo');
-                })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count();
-                
-                return [
-                    'id' => $proyecto->id,
-                    'nombre' => $proyecto->nombre,
-                    'color' => $proyecto->color,
-                    'ubicacion' => $proyecto->ubicacion,
-                    'comision_porcentaje' => $proyecto->pivot->comision_porcentaje ?? $cobrador->comision_porcentaje,
-                    'clientes_asignados' => $proyecto->clientes_count,
-                    'facturas_pendientes' => $facturasPendientes,
-                ];
-            });
-        
-        // Si no tiene proyectos en pivot, usar proyecto_id directo
+
+        $proyectos = $cobrador->proyectos()->get();
+
         if ($proyectos->isEmpty() && $cobrador->proyecto_id) {
-            $proyecto = \App\Models\Proyecto::withCount(['clientes' => function($q) {
-                $q->where('estado', 'activo');
-            }])->find($cobrador->proyecto_id);
-            
-            if ($proyecto) {
-                $facturasPendientes = Factura::whereHas('cliente', function($q) use ($proyecto) {
-                    $q->where('proyecto_id', $proyecto->id)
-                      ->where('estado', 'activo');
-                })->whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count();
-                
-                $proyectos = collect([[
-                    'id' => $proyecto->id,
-                    'nombre' => $proyecto->nombre,
-                    'color' => $proyecto->color,
-                    'ubicacion' => $proyecto->ubicacion,
-                    'comision_porcentaje' => $cobrador->comision_porcentaje,
-                    'clientes_asignados' => $proyecto->clientes_count,
-                    'facturas_pendientes' => $facturasPendientes,
-                ]]);
-            }
+            $proyecto = \App\Models\Proyecto::find($cobrador->proyecto_id);
+            $proyectos = $proyecto ? collect([$proyecto]) : collect();
         }
+
+        $proyectos = $proyectos->map(fn ($proyecto) => $this->statsProyecto($cobrador, $proyecto));
 
         return response()->json([
             'success' => true,
             'proyectos' => $proyectos,
         ]);
+    }
+
+    private function statsProyecto(Cobrador $cobrador, $proyecto): array
+    {
+        $clientesAsignados = $cobrador->clientes()
+            ->where('proyecto_id', $proyecto->id)
+            ->where('estado', '!=', 'retirado')
+            ->count();
+
+        $facturasPendientesQuery = Factura::whereHas('cliente', function ($q) use ($proyecto, $cobrador) {
+            $q->where('proyecto_id', $proyecto->id)
+                ->where('cobrador_id', $cobrador->id)
+                ->where('estado', '!=', 'retirado');
+        })->whereIn('estado', ['pendiente', 'parcial', 'vencida']);
+
+        $totalCobrado = (float) Pago::where('cobrador_id', $cobrador->id)
+            ->whereMonth('fecha_pago', now()->month)
+            ->whereYear('fecha_pago', now()->year)
+            ->whereHas('factura.cliente', fn ($q) => $q->where('proyecto_id', $proyecto->id))
+            ->sum('monto');
+
+        return [
+            'id' => $proyecto->id,
+            'nombre' => $proyecto->nombre,
+            'color' => $proyecto->color,
+            'ubicacion' => $proyecto->ubicacion,
+            'comision_porcentaje' => data_get($proyecto, 'pivot.comision_porcentaje', $cobrador->comision_porcentaje),
+            'clientes_asignados' => $clientesAsignados,
+            'facturas_pendientes' => (clone $facturasPendientesQuery)->count(),
+            'total_cobrado' => $totalCobrado,
+            'saldo_pendiente' => (float) (clone $facturasPendientesQuery)->sum('saldo'),
+        ];
     }
 
     public function syncProyecto(Request $request, $proyecto_id)

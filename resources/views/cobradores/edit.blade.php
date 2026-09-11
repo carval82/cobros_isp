@@ -7,7 +7,7 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-user-edit me-2"></i>Editar Cobrador
     </h1>
-    <a href="{{ route('cobradores.index') }}" class="btn btn-outline-secondary">
+    <a href="{{ list_back(route('cobradores.index')) }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left me-1"></i>Volver
     </a>
 </div>
@@ -17,6 +17,7 @@
         <form action="{{ route('cobradores.update', $cobrador) }}" method="POST">
             @csrf
             @method('PUT')
+            @include('partials.return-field')
             
             <div class="row g-3">
                 <div class="col-md-6">
@@ -85,7 +86,7 @@
             <hr>
             
             <div class="d-flex justify-content-end gap-2">
-                <a href="{{ route('cobradores.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+                <a href="{{ list_back(route('cobradores.index')) }}" class="btn btn-outline-secondary">Cancelar</a>
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-save me-1"></i>Guardar Cambios
                 </button>

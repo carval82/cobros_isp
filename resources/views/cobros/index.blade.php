@@ -74,7 +74,7 @@
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ route('cobros.show', $cobro) }}" class="btn btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                <a href="{{ list_to('cobros.show', $cobro) }}" class="btn btn-outline-primary"><i class="fas fa-eye"></i></a>
                                 @if($cobro->estado == 'abierto')
                                 <form action="{{ route('cobros.cerrar', $cobro) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Cerrar este cobro?')">
                                     @csrf

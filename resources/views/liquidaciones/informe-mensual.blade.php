@@ -52,7 +52,7 @@
 </div>
 
 <p class="text-muted mb-3">
-    Proyección según clientes asignados a cada cobrador en <strong>{{ $informe['periodo'] }}</strong>.
+    Asignación y cobros separados por proyecto. La proyección usa los clientes asignados a cada cobrador en <strong>{{ $informe['periodo'] }}</strong>.
     El recaudo y la liquidación quedan con lo cobrado real, aunque no se haya cumplido la meta.
 </p>
 
@@ -97,8 +97,8 @@
             <table class="table table-hover mb-0">
                 <thead>
                     <tr>
-                        <th>Cobrador</th>
-                        <th class="text-center">Clientes</th>
+                        <th>Cobrador / Proyecto</th>
+                        <th class="text-center">Asignados</th>
                         <th class="text-end">Debe cobrar</th>
                         <th class="text-end">Cobró</th>
                         <th class="text-end">Pendiente</th>
@@ -111,15 +111,15 @@
                 </thead>
                 <tbody>
                     @forelse($informe['cobradores'] as $fila)
-                    <tr>
+                    <tr class="table-light">
                         <td>
                             <strong>{{ $fila['nombre'] }}</strong>
                             <br><small class="text-muted">{{ $fila['documento'] }} · {{ number_format($fila['comision_porcentaje'], 1) }}%</small>
                         </td>
-                        <td class="text-center">{{ $fila['clientes'] }}</td>
-                        <td class="text-end">${{ number_format($fila['proyectado'], 0, ',', '.') }}</td>
-                        <td class="text-end text-success">${{ number_format($fila['recaudado'], 0, ',', '.') }}</td>
-                        <td class="text-end text-danger">${{ number_format($fila['pendiente'], 0, ',', '.') }}</td>
+                        <td class="text-center fw-bold">{{ $fila['clientes'] }}</td>
+                        <td class="text-end fw-bold">${{ number_format($fila['proyectado'], 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold text-success">${{ number_format($fila['recaudado'], 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold text-danger">${{ number_format($fila['pendiente'], 0, ',', '.') }}</td>
                         <td class="text-center">
                             @php $color = $fila['cumplimiento'] >= 90 ? 'success' : ($fila['cumplimiento'] >= 50 ? 'warning' : 'danger'); @endphp
                             <span class="badge bg-{{ $color }}">{{ number_format($fila['cumplimiento'], 1) }}%</span>
@@ -158,6 +158,23 @@
                             </div>
                         </td>
                     </tr>
+                    @forelse($fila['proyectos'] as $proyecto)
+                    <tr>
+                        <td class="ps-4">
+                            <span class="badge me-2" style="background-color: {{ $proyecto['color'] }};">&nbsp;</span>
+                            {{ $proyecto['nombre'] }}
+                        </td>
+                        <td class="text-center">{{ $proyecto['clientes'] }}</td>
+                        <td class="text-end">${{ number_format($proyecto['proyectado'], 0, ',', '.') }}</td>
+                        <td class="text-end text-success">${{ number_format($proyecto['recaudado'], 0, ',', '.') }}</td>
+                        <td class="text-end text-danger">${{ number_format($proyecto['pendiente'], 0, ',', '.') }}</td>
+                        <td colspan="5" class="text-muted small">Asignados y cobros de este proyecto</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td class="ps-4 text-muted" colspan="10">Sin clientes asignados en ningún proyecto</td>
+                    </tr>
+                    @endforelse
                     @empty
                     <tr>
                         <td colspan="10" class="text-center py-4 text-muted">No hay cobradores activos</td>

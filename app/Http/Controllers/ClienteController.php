@@ -33,7 +33,7 @@ class ClienteController extends Controller
             });
         }
 
-        $clientes = $query->orderBy('nombre')->paginate(25);
+        $clientes = $query->orderBy('nombre')->paginate(25)->withQueryString();
         $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
 
         return view('clientes.index', compact('clientes', 'proyectos'));
@@ -117,8 +117,10 @@ class ClienteController extends Controller
             $mensaje = 'Cliente nuevo creado. Primera factura: ' . $cliente->fresh()->etiquetaPrimeraFactura() . '.';
         }
 
-        return redirect()->route('clientes.show', $cliente)
-            ->with('success', $mensaje);
+        return redirect()->route('clientes.show', array_filter([
+            'cliente' => $cliente,
+            'return' => \App\Support\ListReturn::isSafe($request->input('return')) ? $request->input('return') : null,
+        ]))->with('success', $mensaje);
     }
 
     public function show(Cliente $cliente)
@@ -205,18 +207,14 @@ class ClienteController extends Controller
             $mensaje = $resultado['mensaje'];
         }
 
-        return redirect()->route('clientes.show', $cliente)
-            ->with('success', $mensaje);
+        return redirect()->route('clientes.show', array_filter([
+            'cliente' => $cliente,
+            'return' => \App\Support\ListReturn::isSafe($request->input('return')) ? $request->input('return') : null,
+        ]))->with('success', $mensaje);
     }
 
     public function retirar(Cliente $cliente)
     {
-        if ($cliente->estado === 'retirado') {
-            $retiro = app(FacturacionService::class)->cerrarCuentasPorRetiro($cliente);
-            return redirect()->route('clientes.show', $cliente)
-                ->with('success', $retiro['mensaje']);
-        }
-
         $retiro = app(FacturacionService::class)->cerrarCuentasPorRetiro($cliente);
 
         return redirect()->route('clientes.show', $cliente)
@@ -227,7 +225,7 @@ class ClienteController extends Controller
     {
         $cliente->delete();
 
-        return redirect()->route('clientes.index')
+        return redirect(list_back(route('clientes.index')))
             ->with('success', 'Cliente eliminado correctamente');
     }
 

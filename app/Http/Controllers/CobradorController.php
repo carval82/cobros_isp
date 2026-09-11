@@ -63,13 +63,43 @@ class CobradorController extends Controller
 
     public function show(Cobrador $cobradore)
     {
-        $cobradore->load(['clientes', 'cobros' => function ($q) {
+        $cobradore->load(['clientes.proyecto', 'cobros' => function ($q) {
             $q->orderBy('fecha', 'desc')->limit(20);
         }, 'liquidaciones' => function ($q) {
             $q->orderBy('fecha_liquidacion', 'desc')->limit(10);
         }]);
 
-        return view('cobradores.show', ['cobrador' => $cobradore]);
+        $mes = now()->month;
+        $anio = now()->year;
+        $clientesActivos = $cobradore->clientes->where('estado', '!=', 'retirado');
+        $pagosMes = \App\Models\Pago::where('cobrador_id', $cobradore->id)
+            ->whereMonth('fecha_pago', $mes)
+            ->whereYear('fecha_pago', $anio)
+            ->with('factura:id,cliente_id')
+            ->get();
+
+        $resumenProyectos = $clientesActivos
+            ->groupBy(fn ($cliente) => $cliente->proyecto_id ?: 0)
+            ->map(function ($grupo) use ($pagosMes) {
+                $ids = $grupo->pluck('id');
+                $proyecto = $grupo->first()?->proyecto;
+                $cobrado = $pagosMes->filter(fn ($pago) => $ids->contains($pago->factura?->cliente_id))->sum('monto');
+
+                return [
+                    'nombre' => $proyecto?->nombre ?? 'Sin proyecto',
+                    'color' => $proyecto?->color ?? '#64748b',
+                    'asignados' => $grupo->count(),
+                    'cobrado' => (float) $cobrado,
+                    'clientes' => $grupo->values(),
+                ];
+            })
+            ->sortBy('nombre')
+            ->values();
+
+        return view('cobradores.show', [
+            'cobrador' => $cobradore,
+            'resumenProyectos' => $resumenProyectos,
+        ]);
     }
 
     public function edit(Cobrador $cobradore)
@@ -109,7 +139,7 @@ class CobradorController extends Controller
         // Sincronizar proyectos asignados
         $cobradore->proyectos()->sync($proyectos);
 
-        return redirect()->route('cobradores.index')
+        return redirect(list_back(route('cobradores.index')))
             ->with('success', 'Cobrador actualizado correctamente');
     }
 

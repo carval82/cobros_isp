@@ -59,7 +59,7 @@
                 <tbody>
                     @forelse($pagos as $pago)
                     <tr>
-                        <td><a href="{{ route('pagos.show', $pago) }}"><strong>{{ $pago->numero_recibo }}</strong></a></td>
+                        <td><a href="{{ list_to('pagos.show', $pago) }}"><strong>{{ $pago->numero_recibo }}</strong></a></td>
                         <td>{{ $pago->fecha_pago->format('d/m/Y') }}</td>
                         <td>{{ $pago->factura->cliente->nombre ?? '-' }}</td>
                         <td><a href="{{ route('facturas.show', $pago->factura_id) }}">{{ $pago->factura->numero ?? '-' }}</a></td>

@@ -7,7 +7,7 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-receipt me-2"></i>Recibo {{ $pago->numero_recibo }}
     </h1>
-    <a href="{{ route('pagos.index') }}" class="btn btn-outline-secondary">
+    <a href="{{ list_back(route('pagos.index')) }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left me-1"></i>Volver
     </a>
 </div>

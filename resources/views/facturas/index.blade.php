@@ -113,7 +113,7 @@
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ route('facturas.show', $factura) }}" class="btn btn-outline-primary" title="Ver">
+                                <a href="{{ list_to('facturas.show', $factura) }}" class="btn btn-outline-primary" title="Ver">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <a href="{{ $factura->urlPublica() }}" class="btn btn-outline-secondary" title="Enlace público" target="_blank">

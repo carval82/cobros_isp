@@ -7,7 +7,7 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-edit me-2"></i>Editar Factura {{ $factura->numero }}
     </h1>
-    <a href="{{ route('facturas.show', $factura) }}" class="btn btn-outline-secondary">
+    <a href="{{ list_back(route('facturas.show', $factura)) }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left me-1"></i>Volver
     </a>
 </div>
@@ -17,6 +17,7 @@
         <form action="{{ route('facturas.update', $factura) }}" method="POST">
             @csrf
             @method('PUT')
+            @include('partials.return-field')
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Cliente</label>

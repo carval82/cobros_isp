@@ -49,10 +49,10 @@
             <i class="fas fa-dollar-sign me-1"></i>Registrar Pago
         </a>
         @endif
-        <a href="{{ route('facturas.edit', $factura) }}" class="btn btn-outline-primary">
+        <a href="{{ list_to('facturas.edit', $factura, true) }}" class="btn btn-outline-primary">
             <i class="fas fa-edit me-1"></i>Editar
         </a>
-        <a href="{{ route('facturas.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ list_back(route('facturas.index')) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>Volver
         </a>
     </div>

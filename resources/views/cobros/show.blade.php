@@ -16,7 +16,7 @@
             </button>
         </form>
         @endif
-        <a href="{{ route('cobros.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ list_back(route('cobros.index')) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>Volver
         </a>
     </div>

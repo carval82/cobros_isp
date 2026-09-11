@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\Cobrador;
+use App\Models\Cliente;
 use App\Models\Cobro;
 use App\Models\Factura;
 use App\Models\Liquidacion;
 use App\Models\Pago;
+use App\Models\Proyecto;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -57,6 +59,7 @@ class CobradorInformeService
         $fila = $this->filaCobrador($cobrador, $mes, $anio, $desde, $hasta);
 
         $clientes = $cobrador->clientes()
+            ->with('proyecto')
             ->where('estado', '!=', 'retirado')
             ->orderBy('nombre')
             ->get()
@@ -72,6 +75,9 @@ class CobradorInformeService
                     'nombre' => $cliente->nombre,
                     'documento' => $cliente->documento,
                     'estado' => $cliente->estado,
+                    'proyecto_id' => $cliente->proyecto_id,
+                    'proyecto' => $cliente->proyecto?->nombre ?? 'Sin proyecto',
+                    'proyecto_color' => $cliente->proyecto?->color ?? '#64748b',
                     'proyectado' => (float) $facturas->sum('total'),
                     'pendiente' => (float) $facturas->sum('saldo'),
                     'recaudado' => (float) $facturas->sum(fn ($f) => $f->total - $f->saldo),
@@ -87,6 +93,7 @@ class CobradorInformeService
         return [
             'cobrador' => $fila,
             'clientes' => $clientes,
+            'proyectos' => $fila['proyectos'],
             'periodo' => ($this->meses()[$mes] ?? $mes) . ' ' . $anio,
             'mes' => $mes,
             'anio' => $anio,
@@ -162,24 +169,52 @@ class CobradorInformeService
 
     private function filaCobrador(Cobrador $cobrador, int $mes, int $anio, Carbon $desde, Carbon $hasta): array
     {
-        $clienteIds = $cobrador->clientes()
+        $clientes = $cobrador->clientes()
             ->where('estado', '!=', 'retirado')
-            ->pluck('id');
+            ->get(['id', 'proyecto_id']);
+
+        $clienteIds = $clientes->pluck('id');
 
         $facturas = Factura::whereIn('cliente_id', $clienteIds)
             ->where('mes', $mes)
             ->where('anio', $anio)
-            ->get();
+            ->get(['id', 'cliente_id', 'total', 'saldo']);
+
+        $pagos = Pago::where('cobrador_id', $cobrador->id)
+            ->whereMonth('fecha_pago', $mes)
+            ->whereYear('fecha_pago', $anio)
+            ->with(['factura:id,cliente_id'])
+            ->get(['id', 'factura_id', 'monto']);
+
+        $proyectos = Proyecto::whereIn('id', $clientes->pluck('proyecto_id')->filter()->unique())
+            ->get(['id', 'nombre', 'color'])
+            ->keyBy('id');
+
+        $proyectosFila = $clientes
+            ->groupBy(fn (Cliente $cliente) => $cliente->proyecto_id ?: 0)
+            ->map(function ($grupo, $proyectoId) use ($facturas, $pagos, $proyectos) {
+                $ids = $grupo->pluck('id');
+                $facts = $facturas->whereIn('cliente_id', $ids);
+                $recs = $pagos->filter(fn (Pago $pago) => $ids->contains($pago->factura?->cliente_id));
+                $proyecto = $proyectos->get((int) $proyectoId);
+
+                return [
+                    'id' => $proyectoId ? (int) $proyectoId : null,
+                    'nombre' => $proyecto?->nombre ?? 'Sin proyecto',
+                    'color' => $proyecto?->color ?? '#64748b',
+                    'clientes' => $grupo->count(),
+                    'proyectado' => (float) $facts->sum('total'),
+                    'pendiente' => (float) $facts->sum('saldo'),
+                    'recaudado' => (float) $recs->sum('monto'),
+                ];
+            })
+            ->sortBy('nombre')
+            ->values();
 
         $proyectado = (float) $facturas->sum('total');
         $pendiente = (float) $facturas->sum('saldo');
         $recaudadoCartera = (float) $facturas->sum(fn ($f) => $f->total - $f->saldo);
-
-        $recaudado = (float) Pago::where('cobrador_id', $cobrador->id)
-            ->whereMonth('fecha_pago', $mes)
-            ->whereYear('fecha_pago', $anio)
-            ->sum('monto');
-
+        $recaudado = (float) $pagos->sum('monto');
         $comision = round($recaudado * ((float) $cobrador->comision_porcentaje / 100), 2);
         $cumplimiento = $proyectado > 0 ? round(($recaudadoCartera / $proyectado) * 100, 1) : 0;
 
@@ -194,7 +229,7 @@ class CobradorInformeService
             'nombre' => $cobrador->nombre,
             'documento' => $cobrador->documento,
             'comision_porcentaje' => (float) $cobrador->comision_porcentaje,
-            'clientes' => (int) ($cobrador->clientes_asignados ?? $clienteIds->count()),
+            'clientes' => $clientes->count(),
             'proyectado' => $proyectado,
             'recaudado' => $recaudado,
             'recaudado_cartera' => $recaudadoCartera,
@@ -204,6 +239,7 @@ class CobradorInformeService
             'a_entregar' => $recaudado - $comision,
             'liquidacion_id' => $liquidacion?->id,
             'liquidacion_estado' => $liquidacion?->estado,
+            'proyectos' => $proyectosFila,
         ];
     }
 }

@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="mb-4">
-    <a href="{{ route('tickets.index') }}" class="text-muted text-decoration-none">
+    <a href="{{ list_back(route('tickets.index')) }}" class="text-muted text-decoration-none">
         <i class="bi bi-arrow-left me-2"></i>Volver a tickets
     </a>
 </div>

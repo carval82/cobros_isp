@@ -18,10 +18,10 @@
             </button>
         </form>
         @endif
-        <a href="{{ route('clientes.edit', $cliente) }}" class="btn btn-outline-primary">
+        <a href="{{ list_to('clientes.edit', $cliente, true) }}" class="btn btn-outline-primary">
             <i class="fas fa-edit me-1"></i>Editar
         </a>
-        <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ list_back(route('clientes.index')) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>Volver
         </a>
     </div>

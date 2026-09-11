@@ -7,7 +7,7 @@
     <h1 class="h3 mb-0">
         <i class="fas fa-users me-2"></i>Clientes
     </h1>
-    <a href="{{ route('clientes.create') }}" class="btn btn-primary">
+    <a href="{{ list_to('clientes.create') }}" class="btn btn-primary">
         <i class="fas fa-plus me-1"></i>Nuevo Cliente
     </a>
 </div>
@@ -71,7 +71,7 @@
                     <tr>
                         <td><strong>{{ $cliente->codigo }}</strong></td>
                         <td>
-                            <a href="{{ route('clientes.show', $cliente) }}">{{ $cliente->nombre }}</a>
+                            <a href="{{ list_to('clientes.show', $cliente) }}">{{ $cliente->nombre }}</a>
                         </td>
                         <td>
                             @if($cliente->proyecto)
@@ -106,10 +106,10 @@
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ route('clientes.show', $cliente) }}" class="btn btn-outline-primary" title="Ver">
+                                <a href="{{ list_to('clientes.show', $cliente) }}" class="btn btn-outline-primary" title="Ver">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ route('clientes.edit', $cliente) }}" class="btn btn-outline-secondary" title="Editar">
+                                <a href="{{ list_to('clientes.edit', $cliente) }}" class="btn btn-outline-secondary" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
                             </div>

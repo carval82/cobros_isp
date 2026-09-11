@@ -60,7 +60,7 @@
                     @forelse($cobradores as $cobrador)
                     <tr>
                         <td>
-                            <a href="{{ route('cobradores.show', $cobrador) }}">
+                            <a href="{{ list_to('cobradores.show', $cobrador) }}">
                                 <strong>{{ $cobrador->nombre }}</strong>
                             </a>
                             @if($cobrador->documento)
@@ -97,10 +97,10 @@
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ route('cobradores.show', $cobrador) }}" class="btn btn-outline-primary" title="Ver">
+                                <a href="{{ list_to('cobradores.show', $cobrador) }}" class="btn btn-outline-primary" title="Ver">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ route('cobradores.edit', $cobrador) }}" class="btn btn-outline-secondary" title="Editar">
+                                <a href="{{ list_to('cobradores.edit', $cobrador) }}" class="btn btn-outline-secondary" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
                             </div>

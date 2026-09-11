@@ -122,7 +122,7 @@
                     </td>
                     <td>{{ $ticket->created_at->format('d/m/Y H:i') }}</td>
                     <td>
-                        <a href="{{ route('tickets.show', $ticket) }}" class="btn btn-sm btn-outline-primary">
+                        <a href="{{ list_to('tickets.show', $ticket) }}" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>

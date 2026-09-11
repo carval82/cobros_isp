@@ -11,7 +11,7 @@
         <a href="{{ route('cobradores.edit', $cobrador) }}" class="btn btn-outline-primary">
             <i class="fas fa-edit me-1"></i>Editar
         </a>
-        <a href="{{ route('cobradores.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ list_back(route('cobradores.index')) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>Volver
         </a>
     </div>
@@ -68,9 +68,15 @@
     </div>
 
     <div class="col-lg-8">
+        @forelse($resumenProyectos as $proyecto)
         <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-users me-2"></i>Clientes Asignados ({{ $cobrador->clientes->count() }})
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge me-2" style="background-color: {{ $proyecto['color'] }};">&nbsp;</span>
+                    {{ $proyecto['nombre'] }}
+                    <small class="text-muted ms-2">{{ $proyecto['asignados'] }} asignados</small>
+                </div>
+                <div class="text-success fw-bold">Cobró este mes ${{ number_format($proyecto['cobrado'], 0, ',', '.') }}</div>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover mb-0">
@@ -83,10 +89,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($cobrador->clientes as $cliente)
+                        @foreach($proyecto['clientes'] as $cliente)
                         <tr>
                             <td>{{ $cliente->codigo }}</td>
-                            <td><a href="{{ route('clientes.show', $cliente) }}">{{ $cliente->nombre }}</a></td>
+                            <td><a href="{{ list_to('clientes.show', $cliente) }}">{{ $cliente->nombre }}</a></td>
                             <td>{{ Str::limit($cliente->direccion, 30) }}</td>
                             <td class="text-center">
                                 <span class="badge bg-{{ $cliente->estado == 'activo' ? 'success' : 'secondary' }}">
@@ -94,15 +100,16 @@
                                 </span>
                             </td>
                         </tr>
-                        @empty
-                        <tr>
-                            <td colspan="4" class="text-center text-muted py-3">Sin clientes asignados</td>
-                        </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
         </div>
+        @empty
+        <div class="card mb-4">
+            <div class="card-body text-center text-muted py-3">Sin clientes asignados</div>
+        </div>
+        @endforelse
 
         <div class="card">
             <div class="card-header">

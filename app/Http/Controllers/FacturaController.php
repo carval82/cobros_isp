@@ -34,7 +34,8 @@ class FacturaController extends Controller
         $facturas = $query->orderBy('anio', 'desc')
             ->orderBy('mes', 'desc')
             ->orderBy('id', 'desc')
-            ->paginate(25);
+            ->paginate(25)
+            ->withQueryString();
 
         return view('facturas.index', compact('facturas'));
     }
@@ -114,8 +115,10 @@ class FacturaController extends Controller
 
         $factura->update($validated);
 
-        return redirect()->route('facturas.show', $factura)
-            ->with('success', 'Factura actualizada correctamente');
+        return redirect()->route('facturas.show', array_filter([
+            'factura' => $factura,
+            'return' => \App\Support\ListReturn::isSafe($request->input('return')) ? $request->input('return') : null,
+        ]))->with('success', 'Factura actualizada correctamente');
     }
 
     public function destroy(Factura $factura)
