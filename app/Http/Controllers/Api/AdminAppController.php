@@ -228,12 +228,12 @@ class AdminAppController extends Controller
                 'total_clientes' => $totalClientes,
                 'total_cobradores' => $totalCobradores,
                 'total_proyectos' => $totalProyectos,
-                'facturado_mes' => $facturadoMes,
-                'recaudado_mes' => $recaudadoMes,
-                'pendiente_mes' => $pendienteMes,
+                'facturado_mes' => (float) $facturadoMes,
+                'recaudado_mes' => (float) $recaudadoMes,
+                'pendiente_mes' => (float) $pendienteMes,
                 'pagos_hoy' => [
                     'cantidad' => $pagosHoy->count(),
-                    'total' => $pagosHoy->sum('monto'),
+                    'total' => (float) $pagosHoy->sum('monto'),
                 ],
                 'tickets_pendientes' => $ticketsPendientes,
                 'tickets_nuevos' => $ticketsNuevos,
@@ -609,6 +609,11 @@ class AdminAppController extends Controller
         ]);
 
         $plan->update($request->all());
+        if ($request->filled('precio')) {
+            $plan->servicios()->where('estado', 'activo')->update([
+                'precio_mensual' => $request->precio,
+            ]);
+        }
 
         return response()->json([
             'success' => true,

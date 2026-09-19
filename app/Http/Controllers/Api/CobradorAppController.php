@@ -139,6 +139,7 @@ class CobradorAppController extends Controller
 
         $query = Cliente::with(['proyecto', 'servicios.planServicio'])
             ->where('proyecto_id', $proyecto_id)
+            ->where('cobrador_id', $cobrador->id)
             ->where('estado', 'activo');
 
         if ($lastSync) {
@@ -173,8 +174,9 @@ class CobradorAppController extends Controller
         });
 
         $facturasPendientes = Factura::with('cliente')
-            ->whereHas('cliente', function($q) use ($proyecto_id) {
+            ->whereHas('cliente', function($q) use ($proyecto_id, $cobrador) {
                 $q->where('proyecto_id', $proyecto_id)
+                  ->where('cobrador_id', $cobrador->id)
                   ->where('estado', 'activo');
             })
             ->whereIn('estado', ['pendiente', 'parcial', 'vencida'])
@@ -206,15 +208,18 @@ class CobradorAppController extends Controller
             })
             ->get(['id', 'nombre', 'velocidad_bajada', 'velocidad_subida', 'precio']);
 
-        // Estadísticas de cobros del día para este cobrador
+        $proyecto = \App\Models\Proyecto::find($proyecto_id);
+        $stats = $proyecto ? $this->statsProyecto($cobrador, $proyecto) : [];
+
         $hoy = Carbon::today();
         $cobrosHoy = Pago::where('cobrador_id', $cobrador->id)
             ->whereDate('fecha_pago', $hoy)
+            ->whereHas('factura.cliente', fn ($q) => $q->where('proyecto_id', $proyecto_id))
             ->get();
-        
+
         $resumenDia = [
             'cobros_count' => $cobrosHoy->count(),
-            'total_cobrado' => $cobrosHoy->sum('monto'),
+            'total_cobrado' => (float) $cobrosHoy->sum('monto'),
             'fecha' => $hoy->format('Y-m-d'),
         ];
 
@@ -226,6 +231,7 @@ class CobradorAppController extends Controller
                 'facturas_pendientes' => $facturasPendientes,
                 'planes' => $planes,
                 'resumen_dia' => $resumenDia,
+                'stats' => $stats,
                 'server_time' => now()->toISOString(),
             ]
         ]);

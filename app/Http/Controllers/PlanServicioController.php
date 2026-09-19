@@ -78,6 +78,9 @@ class PlanServicioController extends Controller
         $validated['activo'] = $request->has('activo');
 
         $plane->update($validated);
+        $plane->servicios()->where('estado', 'activo')->update([
+            'precio_mensual' => $validated['precio'],
+        ]);
 
         return redirect()->route('planes.index')
             ->with('success', 'Plan actualizado correctamente');
