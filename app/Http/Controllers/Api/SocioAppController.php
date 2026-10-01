@@ -7,6 +7,7 @@ use App\Models\ParticipacionProyecto;
 use App\Models\Proyecto;
 use App\Models\Pago;
 use App\Models\GastoProyecto;
+use App\Services\AtribucionPago;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -119,12 +120,13 @@ class SocioAppController extends Controller
         $anio = $request->get('anio', Carbon::now()->year);
 
         // Calcular ingresos del mes
-        $ingresos = Pago::whereHas('factura.servicio.cliente', function($q) use ($proyecto_id) {
-            $q->where('proyecto_id', $proyecto_id);
-        })
-        ->whereMonth('fecha_pago', $mes)
-        ->whereYear('fecha_pago', $anio)
-        ->sum('monto');
+        $ingresos = AtribucionPago::aplicar(
+            Pago::whereHas('factura.cliente', function ($q) use ($proyecto_id) {
+                $q->where('proyecto_id', $proyecto_id);
+            }),
+            (int) $mes,
+            (int) $anio
+        )->sum('monto');
 
         $gastosList = GastoProyecto::where('proyecto_id', $proyecto_id)
             ->whereMonth('fecha', $mes)
@@ -157,12 +159,13 @@ class SocioAppController extends Controller
             $m = $fecha->month;
             $a = $fecha->year;
 
-            $ing = Pago::whereHas('factura.servicio.cliente', function($q) use ($proyecto_id) {
-                $q->where('proyecto_id', $proyecto_id);
-            })
-            ->whereMonth('fecha_pago', $m)
-            ->whereYear('fecha_pago', $a)
-            ->sum('monto');
+            $ing = AtribucionPago::aplicar(
+                Pago::whereHas('factura.cliente', function ($q) use ($proyecto_id) {
+                    $q->where('proyecto_id', $proyecto_id);
+                }),
+                (int) $m,
+                (int) $a
+            )->sum('monto');
 
             $gas = GastoProyecto::where('proyecto_id', $proyecto_id)
                 ->whereMonth('fecha', $m)

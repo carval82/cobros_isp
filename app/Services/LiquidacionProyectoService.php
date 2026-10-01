@@ -23,13 +23,13 @@ class LiquidacionProyectoService
     {
         $proyecto->loadMissing('cobradoresAsignados');
 
-        $pagos = Pago::with('cobrador')
-            ->whereHas('factura.cliente', function ($q) use ($proyecto) {
+        $pagos = AtribucionPago::aplicar(
+            Pago::with('cobrador')->whereHas('factura.cliente', function ($q) use ($proyecto) {
                 $q->where('proyecto_id', $proyecto->id);
-            })
-            ->whereMonth('fecha_pago', $mes)
-            ->whereYear('fecha_pago', $anio)
-            ->get();
+            }),
+            $mes,
+            $anio
+        )->get();
 
         $totalIngresos = (float) $pagos->sum('monto');
 

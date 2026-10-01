@@ -14,6 +14,7 @@ use App\Models\Servicio;
 use App\Models\GastoProyecto;
 use App\Models\ParticipacionProyecto;
 use App\Models\Ticket;
+use App\Services\AtribucionPago;
 use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -1030,11 +1031,13 @@ class AdminAppController extends Controller
         $anio = $request->anio ?? now()->year;
 
         // Ingresos del mes (pagos recibidos)
-        $ingresos = Pago::whereHas('factura.servicio.cliente', function($q) use ($proyectoId) {
-            $q->where('proyecto_id', $proyectoId);
-        })->whereMonth('fecha_pago', $mes)
-          ->whereYear('fecha_pago', $anio)
-          ->sum('monto');
+        $ingresos = AtribucionPago::aplicar(
+            Pago::whereHas('factura.cliente', function ($q) use ($proyectoId) {
+                $q->where('proyecto_id', $proyectoId);
+            }),
+            (int) $mes,
+            (int) $anio
+        )->sum('monto');
 
         // Gastos del mes
         $gastos = GastoProyecto::where('proyecto_id', $proyectoId)

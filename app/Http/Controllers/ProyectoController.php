@@ -7,6 +7,7 @@ use App\Models\Proyecto;
 use App\Models\Cliente;
 use App\Models\Factura;
 use App\Models\Pago;
+use App\Services\AtribucionPago;
 use Illuminate\Http\Request;
 
 class ProyectoController extends Controller
@@ -68,10 +69,11 @@ class ProyectoController extends Controller
         })->where('mes', $mes)->where('anio', $anio)->get();
 
         $estadisticas['facturado_mes'] = $facturasDelMes->sum('total');
-        $estadisticas['recaudado_mes'] = Pago::whereIn('factura_id', $facturasDelMes->pluck('id'))
-            ->whereMonth('fecha_pago', $mes)
-            ->whereYear('fecha_pago', $anio)
-            ->sum('monto');
+        $estadisticas['recaudado_mes'] = AtribucionPago::aplicar(
+            Pago::whereHas('factura.cliente', fn ($q) => $q->where('proyecto_id', $proyecto->id)),
+            $mes,
+            $anio
+        )->sum('monto');
         $estadisticas['pendiente_mes'] = $facturasDelMes->sum('saldo');
         $estadisticas['gastos_mes'] = GastoProyecto::where('proyecto_id', $proyecto->id)
             ->whereMonth('fecha', $mes)
