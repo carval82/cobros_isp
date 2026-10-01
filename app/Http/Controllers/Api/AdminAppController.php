@@ -208,11 +208,9 @@ class AdminAppController extends Controller
         $totalCobradores = Cobrador::where('estado', 'activo')->count();
         $totalProyectos = Proyecto::where('activo', true)->count();
 
-        $facturasDelMes = Factura::where('mes', $mes)->where('anio', $anio)->get();
+        $facturasDelMes = Factura::where('mes', $mes)->where('anio', $anio)->where('estado', '!=', 'anulada')->get();
         $facturadoMes = $facturasDelMes->sum('total');
-        $recaudadoMes = Pago::whereMonth('fecha_pago', $mes)
-            ->whereYear('fecha_pago', $anio)
-            ->sum('monto');
+        $recaudadoMes = AtribucionPago::aplicar(Pago::query(), $mes, $anio)->sum('monto');
         $pendienteMes = $facturasDelMes->sum('saldo');
 
         $pagosHoy = Pago::whereDate('fecha_pago', today())->get();
@@ -381,6 +379,10 @@ class AdminAppController extends Controller
     public function updateCliente(Request $request, $id)
     {
         $cliente = Cliente::findOrFail($id);
+
+        if ($request->input('cobrador_id') === '') {
+            $request->merge(['cobrador_id' => null]);
+        }
         
         $request->validate([
             'nombre' => 'sometimes|string|max:255',
@@ -690,7 +692,7 @@ class AdminAppController extends Controller
     
     public function facturas(Request $request)
     {
-        $query = Factura::with(['servicio.cliente.proyecto', 'servicio.planServicio']);
+        $query = Factura::with(['cliente.proyecto', 'servicio.planServicio']);
         
         if ($request->mes && $request->anio) {
             $query->where('mes', $request->mes)->where('anio', $request->anio);
@@ -699,7 +701,7 @@ class AdminAppController extends Controller
             $query->where('estado', $request->estado);
         }
         if ($request->proyecto_id) {
-            $query->whereHas('servicio.cliente', function($q) use ($request) {
+            $query->whereHas('cliente', function ($q) use ($request) {
                 $q->where('proyecto_id', $request->proyecto_id);
             });
         }
@@ -709,16 +711,17 @@ class AdminAppController extends Controller
             ->get()
             ->map(fn($f) => [
                 'id' => $f->id,
+                'numero' => $f->numero,
                 'periodo' => $f->periodo,
                 'mes' => $f->mes,
                 'anio' => $f->anio,
-                'total' => $f->total,
-                'saldo' => $f->saldo,
+                'total' => (float) $f->total,
+                'saldo' => (float) $f->saldo,
                 'estado' => $f->estado,
                 'fecha_vencimiento' => $f->fecha_vencimiento?->format('Y-m-d'),
-                'cliente' => $f->servicio?->cliente?->nombre,
-                'cliente_id' => $f->servicio?->cliente?->id,
-                'proyecto' => $f->servicio?->cliente?->proyecto?->nombre,
+                'cliente' => $f->cliente?->nombre,
+                'cliente_id' => $f->cliente_id,
+                'proyecto' => $f->cliente?->proyecto?->nombre,
                 'plan' => $f->servicio?->planServicio?->nombre,
             ]);
 
@@ -732,6 +735,81 @@ class AdminAppController extends Controller
             'success' => true,
             'facturas' => $facturas,
             'totales' => $totales,
+        ]);
+    }
+
+    public function cobrarFactura(Request $request, $id)
+    {
+        $request->validate([
+            'monto' => 'required|numeric|min:0',
+            'descuento' => 'nullable|numeric|min:0',
+            'justificacion_descuento' => 'nullable|string|max:500',
+            'metodo_pago' => 'required|in:efectivo,transferencia,nequi,daviplata',
+            'observaciones' => 'nullable|string|max:500',
+        ]);
+
+        $factura = Factura::findOrFail($id);
+        $descuento = round((float) $request->input('descuento', 0), 2);
+        $monto = round((float) $request->monto, 2);
+        $justificacion = trim((string) $request->input('justificacion_descuento', ''));
+
+        if ($monto <= 0 && $descuento <= 0) {
+            return response()->json(['success' => false, 'message' => 'Indica el valor cobrado o el descuento'], 422);
+        }
+
+        if ($descuento > 0 && mb_strlen($justificacion) < 10) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El descuento debe justificarse con al menos 10 caracteres',
+            ], 422);
+        }
+
+        if ($factura->saldo <= 0) {
+            return response()->json(['success' => false, 'message' => 'Esta factura ya está pagada'], 422);
+        }
+
+        if ($descuento > 0 && abs(($monto + $descuento) - (float) $factura->saldo) > 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Con descuento la factura debe quedar saldada: lo cobrado más el descuento tiene que ser igual al saldo',
+            ], 422);
+        }
+
+        if ($monto > (float) $factura->saldo + 0.01) {
+            return response()->json(['success' => false, 'message' => 'El valor cobrado es mayor al saldo'], 422);
+        }
+
+        DB::transaction(function () use ($request, $factura, $monto, $descuento, $justificacion) {
+            if ($descuento > 0) {
+                $factura->aplicarDescuento($descuento);
+            }
+
+            if ($monto > 0 || $descuento > 0) {
+                Pago::create([
+                    'factura_id' => $factura->id,
+                    'cobrador_id' => null,
+                    'user_id' => $request->user()?->id,
+                    'monto' => $monto,
+                    'descuento' => $descuento,
+                    'justificacion_descuento' => $descuento > 0 ? $justificacion : null,
+                    'fecha_pago' => now(),
+                    'metodo_pago' => $request->metodo_pago,
+                    'notas' => $request->observaciones,
+                ]);
+            }
+        });
+
+        $factura->refresh();
+
+        return response()->json([
+            'success' => true,
+            'message' => $factura->saldo <= 0 ? 'Factura cobrada y saldada' : 'Cobro registrado',
+            'factura' => [
+                'id' => $factura->id,
+                'saldo' => (float) $factura->saldo,
+                'estado' => $factura->estado,
+                'total' => (float) $factura->total,
+            ],
         ]);
     }
 
@@ -781,8 +859,18 @@ class AdminAppController extends Controller
         DB::transaction(function() use ($pago) {
             $factura = $pago->factura;
             if ($factura) {
-                $factura->saldo += $pago->monto;
-                $factura->estado = $factura->saldo >= $factura->total ? 'pendiente' : 'parcial';
+                $descuento = (float) $pago->descuento;
+                if ($descuento > 0) {
+                    $factura->descuento = max(0, (float) $factura->descuento - $descuento);
+                    $factura->total = max(0, (float) $factura->subtotal - (float) $factura->descuento + (float) $factura->recargo);
+                }
+                $factura->saldo = (float) $factura->saldo + (float) $pago->monto + $descuento;
+                if ($factura->saldo >= (float) $factura->total - 0.5) {
+                    $factura->saldo = $factura->total;
+                    $factura->estado = 'pendiente';
+                } else {
+                    $factura->estado = 'parcial';
+                }
                 $factura->save();
             }
             $pago->delete();
@@ -1154,6 +1242,8 @@ class AdminAppController extends Controller
                 'nombre_mes' => $informe['periodo']['nombre'],
             ],
             'resumen' => [
+                'a_cobrar' => $informe['a_cobrar'],
+                'falta_cobrar' => $informe['falta_cobrar'],
                 'total_ingresos' => $informe['ingresos'],
                 'total_gastos' => $informe['gastos'],
                 'total_comisiones' => $informe['comisiones'],

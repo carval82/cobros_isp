@@ -21,7 +21,7 @@
             <span class="badge me-2" style="background-color: {{ $proyecto->color }};">&nbsp;</span>
             Informe {{ $proyecto->nombre }}
         </h1>
-        <small class="text-muted">{{ $informe['periodo']['nombre'] }} · cobrado − gastos = liquidación de cada socio</small>
+        <small class="text-muted">{{ $informe['periodo']['nombre'] }} · a cobrar, cobrado y liquidación de cada socio</small>
     </div>
     <div class="btn-group">
         <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
@@ -56,6 +56,29 @@
 </div>
 
 <div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">A cobrar</div>
+                <div class="stat-value">${{ number_format($informe['a_cobrar'], 0, ',', '.') }}</div>
+                <small class="text-muted">
+                    @if($informe['origen_cobro'] === 'servicios')
+                        Servicios activos. Este mes aún no tiene facturas.
+                    @else
+                        {{ $informe['cantidad_facturas'] }} facturas del mes
+                    @endif
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning h-100">
+            <div class="card-body">
+                <div class="stat-label">Falta por cobrar</div>
+                <div class="stat-value text-warning">${{ number_format($informe['falta_cobrar'], 0, ',', '.') }}</div>
+            </div>
+        </div>
+    </div>
     <div class="col-md-3">
         <div class="card stat-card success h-100">
             <div class="card-body">

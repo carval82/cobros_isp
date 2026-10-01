@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h1 class="h3 mb-0"><i class="fas fa-handshake me-2"></i>Liquidación de socios</h1>
-        <small class="text-muted">Cobrado menos gastos, repartido según el % de cada socio</small>
+        <small class="text-muted">Cuánto se debe cobrar en el mes, cuánto entró y cómo se reparte entre los socios</small>
     </div>
     <div class="btn-group">
         <a href="{{ route('liquidaciones.index') }}" class="btn btn-outline-secondary">Cobradores</a>
@@ -51,17 +51,35 @@
 </div>
 
 @php
+    $totalACobrar = $informes->sum('a_cobrar');
     $totalCobrado = $informes->sum('ingresos');
+    $totalFalta = $informes->sum('falta_cobrar');
     $totalGastos = $informes->sum('gastos');
     $totalUtilidad = $informes->sum('utilidad');
 @endphp
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">A cobrar</div>
+                <div class="stat-value">${{ number_format($totalACobrar, 0, ',', '.') }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
         <div class="card stat-card success">
             <div class="card-body">
                 <div class="stat-label">Cobrado</div>
                 <div class="stat-value text-success">${{ number_format($totalCobrado, 0, ',', '.') }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card warning">
+            <div class="card-body">
+                <div class="stat-label">Falta por cobrar</div>
+                <div class="stat-value text-warning">${{ number_format($totalFalta, 0, ',', '.') }}</div>
             </div>
         </div>
     </div>
@@ -83,6 +101,50 @@
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-header">A cobrar por proyecto</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Proyecto</th>
+                        <th class="text-end">A cobrar</th>
+                        <th class="text-end">Cobrado</th>
+                        <th class="text-end">Falta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($informes as $informe)
+                    <tr>
+                        <td>
+                            <span class="badge me-2" style="background-color: {{ $informe['proyecto']->color }};">&nbsp;</span>
+                            {{ $informe['proyecto']->nombre }}
+                            @if($informe['origen_cobro'] === 'servicios')
+                                <br><small class="text-muted">Según servicios activos. Este mes aún no tiene facturas.</small>
+                            @else
+                                <br><small class="text-muted">{{ $informe['cantidad_facturas'] }} facturas</small>
+                            @endif
+                        </td>
+                        <td class="text-end fw-bold">${{ number_format($informe['a_cobrar'], 0, ',', '.') }}</td>
+                        <td class="text-end text-success">${{ number_format($informe['ingresos'], 0, ',', '.') }}</td>
+                        <td class="text-end text-warning">${{ number_format($informe['falta_cobrar'], 0, ',', '.') }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th>Total</th>
+                        <th class="text-end">${{ number_format($totalACobrar, 0, ',', '.') }}</th>
+                        <th class="text-end">${{ number_format($totalCobrado, 0, ',', '.') }}</th>
+                        <th class="text-end">${{ number_format($totalFalta, 0, ',', '.') }}</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
 @foreach($informes as $informe)
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -98,8 +160,16 @@
     <div class="card-body">
         <div class="row text-center mb-3">
             <div class="col-md-3">
+                <div class="text-muted small">A cobrar</div>
+                <div class="fw-bold">${{ number_format($informe['a_cobrar'], 0, ',', '.') }}</div>
+            </div>
+            <div class="col-md-3">
                 <div class="text-muted small">Cobrado</div>
                 <div class="fw-bold text-success">${{ number_format($informe['ingresos'], 0, ',', '.') }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-muted small">Falta</div>
+                <div class="fw-bold text-warning">${{ number_format($informe['falta_cobrar'], 0, ',', '.') }}</div>
             </div>
             <div class="col-md-3">
                 <div class="text-muted small">Gastos</div>

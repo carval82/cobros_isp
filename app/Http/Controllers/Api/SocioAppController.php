@@ -5,11 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ParticipacionProyecto;
 use App\Models\Proyecto;
-use App\Models\Pago;
 use App\Models\GastoProyecto;
-use App\Services\AtribucionPago;
+use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class SocioAppController extends Controller
@@ -115,27 +113,14 @@ class SocioAppController extends Controller
             return response()->json(['success' => false, 'message' => 'No tiene acceso a este proyecto'], 403);
         }
 
-        $proyecto = Proyecto::find($proyecto_id);
-        $mes = $request->get('mes', Carbon::now()->month);
-        $anio = $request->get('anio', Carbon::now()->year);
+        $proyecto = Proyecto::findOrFail($proyecto_id);
+        $mes = (int) $request->get('mes', Carbon::now()->month);
+        $anio = (int) $request->get('anio', Carbon::now()->year);
+        $service = app(LiquidacionProyectoService::class);
+        $informe = $service->calcular($proyecto, $mes, $anio);
+        $mio = $informe['socios']->firstWhere('id', $participacion->id);
 
-        // Calcular ingresos del mes
-        $ingresos = AtribucionPago::aplicar(
-            Pago::whereHas('factura.cliente', function ($q) use ($proyecto_id) {
-                $q->where('proyecto_id', $proyecto_id);
-            }),
-            (int) $mes,
-            (int) $anio
-        )->sum('monto');
-
-        $gastosList = GastoProyecto::where('proyecto_id', $proyecto_id)
-            ->whereMonth('fecha', $mes)
-            ->whereYear('fecha', $anio)
-            ->orderBy('fecha')
-            ->get();
-
-        $gastos = $gastosList->sum('monto');
-        $gastosDetalle = $gastosList->map(function ($g) {
+        $gastosDetalle = $informe['gastos_detalle']->map(function ($g) {
             return [
                 'id' => $g->id,
                 'fecha' => $g->fecha?->format('d/m/Y'),
@@ -145,43 +130,33 @@ class SocioAppController extends Controller
                 'proveedor' => $g->proveedor,
                 'monto' => (float) $g->monto,
             ];
-        });
+        })->values();
 
-        // Calcular utilidad y participación
-        $utilidad = $ingresos - $gastos;
-        $miParticipacion = $utilidad * ($participacion->porcentaje / 100);
-        $miGasto = $gastos * ($participacion->porcentaje / 100);
+        $socios = $informe['socios']->map(function ($s) use ($participacion) {
+            return [
+                'nombre' => $s['socio'],
+                'porcentaje' => $s['porcentaje'],
+                'gastos' => $s['gastos_proporcional'],
+                'liquidacion' => $s['liquidacion'],
+                'es_mio' => (int) $s['id'] === (int) $participacion->id,
+            ];
+        })->values();
 
-        // Obtener historial de los últimos 6 meses
         $historial = [];
         for ($i = 0; $i < 6; $i++) {
             $fecha = Carbon::now()->subMonths($i);
-            $m = $fecha->month;
-            $a = $fecha->year;
-
-            $ing = AtribucionPago::aplicar(
-                Pago::whereHas('factura.cliente', function ($q) use ($proyecto_id) {
-                    $q->where('proyecto_id', $proyecto_id);
-                }),
-                (int) $m,
-                (int) $a
-            )->sum('monto');
-
-            $gas = GastoProyecto::where('proyecto_id', $proyecto_id)
-                ->whereMonth('fecha', $m)
-                ->whereYear('fecha', $a)
-                ->sum('monto');
-
-            $util = $ing - $gas;
-
+            $item = $service->calcular($proyecto, $fecha->month, $fecha->year);
+            $mioMes = $item['socios']->firstWhere('id', $participacion->id);
             $historial[] = [
-                'mes' => $fecha->format('M Y'),
-                'mes_num' => $m,
-                'anio' => $a,
-                'ingresos' => $ing,
-                'gastos' => $gas,
-                'utilidad' => $util,
-                'mi_participacion' => $util * ($participacion->porcentaje / 100),
+                'mes' => $item['periodo']['nombre'],
+                'mes_num' => $fecha->month,
+                'anio' => $fecha->year,
+                'a_cobrar' => $item['a_cobrar'],
+                'ingresos' => $item['ingresos'],
+                'gastos' => $item['gastos'],
+                'falta_cobrar' => $item['falta_cobrar'],
+                'utilidad' => $item['utilidad'],
+                'mi_participacion' => (float) ($mioMes['liquidacion'] ?? 0),
             ];
         }
 
@@ -199,15 +174,19 @@ class SocioAppController extends Controller
                 'periodo' => [
                     'mes' => $mes,
                     'anio' => $anio,
+                    'nombre' => $informe['periodo']['nombre'],
                 ],
                 'resumen' => [
-                    'ingresos' => (float) $ingresos,
-                    'gastos' => (float) $gastos,
-                    'utilidad' => (float) $utilidad,
-                    'mi_participacion' => (float) $miParticipacion,
-                    'mi_gasto' => (float) $miGasto,
+                    'a_cobrar' => $informe['a_cobrar'],
+                    'ingresos' => $informe['ingresos'],
+                    'gastos' => $informe['gastos'],
+                    'falta_cobrar' => $informe['falta_cobrar'],
+                    'utilidad' => $informe['utilidad'],
+                    'mi_participacion' => (float) ($mio['liquidacion'] ?? 0),
+                    'mi_gasto' => (float) ($mio['gastos_proporcional'] ?? 0),
                 ],
                 'gastos_detalle' => $gastosDetalle,
+                'socios' => $socios,
                 'historial' => $historial,
             ],
         ]);

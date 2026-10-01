@@ -73,6 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Admin - Facturas
     Route::get('/admin/facturas', [AdminAppController::class, 'facturas']);
+    Route::post('/admin/facturas/{id}/cobrar', [AdminAppController::class, 'cobrarFactura']);
     
     // Admin - Pagos
     Route::get('/admin/pagos', [AdminAppController::class, 'pagos']);

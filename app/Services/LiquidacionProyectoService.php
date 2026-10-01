@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Factura;
 use App\Models\GastoProyecto;
 use App\Models\Pago;
 use App\Models\ParticipacionProyecto;
 use App\Models\Proyecto;
+use App\Models\Servicio;
 use Carbon\Carbon;
 
 class LiquidacionProyectoService
@@ -32,6 +34,7 @@ class LiquidacionProyectoService
         )->get();
 
         $totalIngresos = (float) $pagos->sum('monto');
+        $cobroMes = $this->montoACobrar($proyecto, $mes, $anio, $totalIngresos);
 
         $gastos = GastoProyecto::where('proyecto_id', $proyecto->id)
             ->whereMonth('fecha', $mes)
@@ -97,6 +100,10 @@ class LiquidacionProyectoService
                 'anio' => $anio,
                 'nombre' => (self::meses()[$mes] ?? $periodo->monthName) . ' ' . $anio,
             ],
+            'a_cobrar' => $cobroMes['a_cobrar'],
+            'falta_cobrar' => $cobroMes['falta_cobrar'],
+            'cantidad_facturas' => $cobroMes['cantidad_facturas'],
+            'origen_cobro' => $cobroMes['origen'],
             'ingresos' => $totalIngresos,
             'gastos' => $totalGastos,
             'comisiones' => $totalComisiones,
@@ -117,6 +124,45 @@ class LiquidacionProyectoService
             ->orderBy('nombre')
             ->get()
             ->map(fn (Proyecto $proyecto) => $this->calcular($proyecto, $mes, $anio));
+    }
+
+    private function montoACobrar(Proyecto $proyecto, int $mes, int $anio, float $cobrado): array
+    {
+        $facturas = Factura::withTrashed()
+            ->where('mes', $mes)
+            ->where('anio', $anio)
+            ->where('estado', '!=', 'anulada')
+            ->whereHas('cliente', function ($q) use ($proyecto) {
+                $q->where('proyecto_id', $proyecto->id);
+            })
+            ->get(['total', 'saldo']);
+
+        if ($facturas->isNotEmpty()) {
+            $aCobrar = round((float) $facturas->sum('total'), 2);
+
+            return [
+                'a_cobrar' => $aCobrar,
+                'falta_cobrar' => max(0, round($aCobrar - $cobrado, 2)),
+                'cantidad_facturas' => $facturas->count(),
+                'origen' => 'facturas',
+            ];
+        }
+
+        $servicios = Servicio::with('planServicio')
+            ->where('estado', 'activo')
+            ->whereHas('cliente', function ($q) use ($proyecto) {
+                $q->where('proyecto_id', $proyecto->id)->where('estado', '!=', 'retirado');
+            })
+            ->get();
+
+        $aCobrar = round((float) $servicios->sum(fn (Servicio $servicio) => $servicio->precio_mensual), 2);
+
+        return [
+            'a_cobrar' => $aCobrar,
+            'falta_cobrar' => max(0, round($aCobrar - $cobrado, 2)),
+            'cantidad_facturas' => 0,
+            'origen' => 'servicios',
+        ];
     }
 
     private function comisionCobrador(Proyecto $proyecto, $cobrador): float
