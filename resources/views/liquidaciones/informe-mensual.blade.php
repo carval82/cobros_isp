@@ -53,7 +53,7 @@
 
 <p class="text-muted mb-3">
     Asignación y cobros separados por proyecto. La proyección usa los clientes asignados a cada cobrador en <strong>{{ $informe['periodo'] }}</strong>.
-    El recaudo es el dinero cobrado en el mes. Si una factura de este mes se paga después, aquí queda como parcial y el valor entra en la liquidación del mes en que se cobró.
+    Los pagos hechos hasta el día 10 del mes siguiente se quedan en la liquidación de este mes. Desde el día 11 pasan a la liquidación del mes en que se cobró.
 </p>
 
 <div class="row g-3 mb-4">

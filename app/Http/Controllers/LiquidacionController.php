@@ -6,6 +6,7 @@ use App\Models\Liquidacion;
 use App\Models\Cobrador;
 use App\Models\Cobro;
 use App\Models\Pago;
+use App\Services\AtribucionPago;
 use App\Services\CobradorInformeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,15 +115,11 @@ class LiquidacionController extends Controller
     public function show(Liquidacion $liquidacione)
     {
         $liquidacione->load(['cobrador', 'cobros.pagos']);
-        $pagos = Pago::with(['factura.cliente'])
-            ->where('cobrador_id', $liquidacione->cobrador_id)
-            ->whereBetween('fecha_pago', [
-                $liquidacione->fecha_desde->toDateString(),
-                $liquidacione->fecha_hasta->toDateString(),
-            ])
-            ->orderBy('fecha_pago')
-            ->orderBy('id')
-            ->get();
+        $pagos = AtribucionPago::aplicar(
+            Pago::with(['factura.cliente'])->where('cobrador_id', $liquidacione->cobrador_id),
+            (int) $liquidacione->fecha_desde->month,
+            (int) $liquidacione->fecha_desde->year
+        )->orderBy('fecha_pago')->orderBy('id')->get();
 
         return view('liquidaciones.show', [
             'liquidacion' => $liquidacione,

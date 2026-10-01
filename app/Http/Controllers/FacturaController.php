@@ -63,7 +63,7 @@ class FacturaController extends Controller
 
     private function consultaFacturas(Request $request): array
     {
-        $pagadoEnMes = '(select coalesce(sum(pagos.monto), 0) from pagos where pagos.factura_id = facturas.id and pagos.deleted_at is null and month(pagos.fecha_pago) = facturas.mes and year(pagos.fecha_pago) = facturas.anio)';
+        $pagadoEnMes = \App\Services\AtribucionPago::sqlPagadoEnPeriodoFactura();
 
         $query = Factura::with(['cliente.proyecto', 'servicio.planServicio'])
             ->select('facturas.*')

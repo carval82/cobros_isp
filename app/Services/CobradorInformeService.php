@@ -132,19 +132,14 @@ class CobradorInformeService
                 ->whereNull('liquidacion_id')
                 ->get();
 
-            if ($cobros->isNotEmpty()) {
-                $totalRecaudado = (float) $cobros->sum('total_recaudado');
-                $totalComision = (float) $cobros->sum('total_comision');
-                $cantidadPagos = (int) $cobros->sum('cantidad_pagos');
-            } else {
-                $totalRecaudado = (float) Pago::where('cobrador_id', $cobrador->id)
-                    ->whereBetween('fecha_pago', [$desde->toDateString(), $hasta->toDateString()])
-                    ->sum('monto');
-                $totalComision = round($totalRecaudado * ((float) $cobrador->comision_porcentaje / 100), 2);
-                $cantidadPagos = (int) Pago::where('cobrador_id', $cobrador->id)
-                    ->whereBetween('fecha_pago', [$desde->toDateString(), $hasta->toDateString()])
-                    ->count();
-            }
+            $pagosPeriodo = AtribucionPago::aplicar(
+                Pago::where('cobrador_id', $cobrador->id),
+                (int) $desde->month,
+                (int) $desde->year
+            );
+            $totalRecaudado = (float) (clone $pagosPeriodo)->sum('monto');
+            $totalComision = round($totalRecaudado * ((float) $cobrador->comision_porcentaje / 100), 2);
+            $cantidadPagos = (int) (clone $pagosPeriodo)->count();
 
             $liquidacion = Liquidacion::create([
                 'cobrador_id' => $cobrador->id,
@@ -173,17 +168,16 @@ class CobradorInformeService
 
     public function recalcular(Liquidacion $liquidacion): Liquidacion
     {
-        $desde = $liquidacion->fecha_desde->toDateString();
-        $hasta = $liquidacion->fecha_hasta->toDateString();
         $cobrador = $liquidacion->cobrador;
+        $pagosPeriodo = AtribucionPago::aplicar(
+            Pago::where('cobrador_id', $liquidacion->cobrador_id),
+            (int) $liquidacion->fecha_desde->month,
+            (int) $liquidacion->fecha_desde->year
+        );
 
-        $totalRecaudado = (float) Pago::where('cobrador_id', $liquidacion->cobrador_id)
-            ->whereBetween('fecha_pago', [$desde, $hasta])
-            ->sum('monto');
+        $totalRecaudado = (float) (clone $pagosPeriodo)->sum('monto');
         $totalComision = round($totalRecaudado * ((float) $cobrador->comision_porcentaje / 100), 2);
-        $cantidadPagos = (int) Pago::where('cobrador_id', $liquidacion->cobrador_id)
-            ->whereBetween('fecha_pago', [$desde, $hasta])
-            ->count();
+        $cantidadPagos = (int) (clone $pagosPeriodo)->count();
 
         $liquidacion->update([
             'total_recaudado' => $totalRecaudado,
@@ -210,11 +204,11 @@ class CobradorInformeService
 
         $cortes = $this->cortesDelMes($facturas, $mes, $anio)->keyBy('id');
 
-        $pagos = Pago::where('cobrador_id', $cobrador->id)
-            ->whereMonth('fecha_pago', $mes)
-            ->whereYear('fecha_pago', $anio)
-            ->with(['factura:id,cliente_id'])
-            ->get(['id', 'factura_id', 'monto']);
+        $pagos = AtribucionPago::aplicar(
+            Pago::where('cobrador_id', $cobrador->id)->with(['factura:id,cliente_id']),
+            $mes,
+            $anio
+        )->get(['id', 'factura_id', 'monto']);
 
         $proyectos = Proyecto::whereIn('id', $clientes->pluck('proyecto_id')->filter()->unique())
             ->get(['id', 'nombre', 'color'])
@@ -276,20 +270,21 @@ class CobradorInformeService
 
     private function cortesDelMes($facturas, int $mes, int $anio)
     {
-        $finMes = Carbon::create($anio, $mes, 1)->endOfMonth()->endOfDay();
         $pagos = $facturas->isEmpty()
             ? collect()
             : Pago::whereIn('factura_id', $facturas->pluck('id'))->get(['factura_id', 'monto', 'fecha_pago']);
 
-        return $facturas->map(function (Factura $factura) use ($pagos, $finMes, $mes, $anio) {
-            $delMes = $pagos->filter(function (Pago $pago) use ($factura, $mes, $anio) {
+        return $facturas->map(function (Factura $factura) use ($pagos) {
+            $inicio = Carbon::create((int) $factura->anio, (int) $factura->mes, 1)->startOfDay();
+            $limite = AtribucionPago::limiteGracia((int) $factura->mes, (int) $factura->anio);
+            $delMes = $pagos->filter(function (Pago $pago) use ($factura, $inicio, $limite) {
                 return (int) $pago->factura_id === (int) $factura->id
-                    && (int) $pago->fecha_pago->month === $mes
-                    && (int) $pago->fecha_pago->year === $anio;
+                    && $pago->fecha_pago->gte($inicio)
+                    && $pago->fecha_pago->lte($limite);
             });
-            $despues = $pagos->filter(function (Pago $pago) use ($factura, $finMes) {
+            $despues = $pagos->filter(function (Pago $pago) use ($factura, $limite) {
                 return (int) $pago->factura_id === (int) $factura->id
-                    && $pago->fecha_pago->gt($finMes);
+                    && $pago->fecha_pago->gt($limite);
             });
 
             $pagadoMes = (float) $delMes->sum('monto');
