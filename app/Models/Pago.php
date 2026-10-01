@@ -64,10 +64,18 @@ class Pago extends Model
 
         static::created(function ($pago) {
             $pago->factura->registrarPago($pago->monto);
-            
+
             if ($pago->cobro) {
                 $pago->cobro->recalcularTotales();
             }
+        });
+
+        static::saved(function ($pago) {
+            app(\App\Services\CobradorInformeService::class)->sincronizarLiquidacion($pago);
+        });
+
+        static::deleted(function ($pago) {
+            app(\App\Services\CobradorInformeService::class)->sincronizarLiquidacion($pago);
         });
     }
 }

@@ -54,4 +54,16 @@ class AtribucionPago
     {
         return Carbon::create($anio, $mes, 1)->addMonth()->addDays(self::DIAS_GRACIA - 1)->endOfDay();
     }
+
+    public static function periodoLiquidacion(Carbon $fechaPago, int $facturaMes, int $facturaAnio): array
+    {
+        $inicio = Carbon::create($facturaAnio, $facturaMes, 1)->startOfDay();
+        $limite = self::limiteGracia($facturaMes, $facturaAnio);
+
+        if ($fechaPago->gte($inicio) && $fechaPago->lte($limite)) {
+            return [$facturaMes, $facturaAnio];
+        }
+
+        return [(int) $fechaPago->month, (int) $fechaPago->year];
+    }
 }

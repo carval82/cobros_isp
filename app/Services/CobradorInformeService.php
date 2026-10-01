@@ -189,6 +189,57 @@ class CobradorInformeService
         return $liquidacion->fresh();
     }
 
+    public function sincronizarLiquidacion(Pago $pago): void
+    {
+        $pago->loadMissing('factura');
+        $periodos = [];
+
+        if ($pago->cobrador_id && $pago->factura && $pago->fecha_pago) {
+            [$mes, $anio] = AtribucionPago::periodoLiquidacion(
+                $pago->fecha_pago,
+                (int) $pago->factura->mes,
+                (int) $pago->factura->anio
+            );
+            $periodos[] = [(int) $pago->cobrador_id, $mes, $anio];
+        }
+
+        $cobradorAnterior = $pago->getOriginal('cobrador_id');
+        $facturaAnteriorId = $pago->getOriginal('factura_id');
+        $fechaAnterior = $pago->getOriginal('fecha_pago');
+        if ($fechaAnterior && $facturaAnteriorId && $cobradorAnterior) {
+            $facturaAnterior = (int) $facturaAnteriorId === (int) $pago->factura_id
+                ? $pago->factura
+                : Factura::find($facturaAnteriorId);
+            if ($facturaAnterior) {
+                [$mes, $anio] = AtribucionPago::periodoLiquidacion(
+                    Carbon::parse($fechaAnterior),
+                    (int) $facturaAnterior->mes,
+                    (int) $facturaAnterior->anio
+                );
+                $periodos[] = [(int) $cobradorAnterior, $mes, $anio];
+            }
+        }
+
+        $vistos = [];
+        foreach ($periodos as [$cobradorId, $mes, $anio]) {
+            $clave = $cobradorId.'-'.$mes.'-'.$anio;
+            if (isset($vistos[$clave])) {
+                continue;
+            }
+            $vistos[$clave] = true;
+
+            $liquidacion = Liquidacion::where('cobrador_id', $cobradorId)
+                ->whereMonth('fecha_desde', $mes)
+                ->whereYear('fecha_desde', $anio)
+                ->where('estado', '!=', 'anulada')
+                ->first();
+
+            if ($liquidacion) {
+                $this->recalcular($liquidacion);
+            }
+        }
+    }
+
     private function filaCobrador(Cobrador $cobrador, int $mes, int $anio, Carbon $desde, Carbon $hasta): array
     {
         $clientes = $cobrador->clientes()
