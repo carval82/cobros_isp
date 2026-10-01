@@ -361,6 +361,8 @@ const App = {
         
         document.getElementById('pagoFacturaId').value = factura.id;
         document.getElementById('pagoMonto').value = factura.saldo;
+        document.getElementById('pagoDescuento').value = 0;
+        document.getElementById('pagoJustificacion').value = '';
         document.getElementById('pagoFacturaInfo').innerHTML = `
             <div class="fw-bold">${factura.cliente_nombre}</div>
             <div class="text-muted">${factura.periodo} - ${factura.numero}</div>
@@ -377,13 +379,28 @@ const App = {
         event.preventDefault();
         
         const facturaId = parseInt(document.getElementById('pagoFacturaId').value);
-        const monto = parseFloat(document.getElementById('pagoMonto').value);
+        const monto = parseFloat(document.getElementById('pagoMonto').value) || 0;
+        const descuento = parseFloat(document.getElementById('pagoDescuento').value) || 0;
+        const justificacion = document.getElementById('pagoJustificacion').value.trim();
         const metodo = document.getElementById('pagoMetodo').value;
         const observaciones = document.getElementById('pagoObservaciones').value;
+        const facturaActual = await this.dbGet('facturas', facturaId);
+        const saldo = facturaActual ? parseFloat(facturaActual.saldo) : 0;
+
+        if (descuento > 0 && justificacion.length < 10) {
+            alert('El descuento debe justificarse con al menos 10 caracteres');
+            return;
+        }
+        if (descuento > 0 && Math.abs((monto + descuento) - saldo) > 1) {
+            alert('Con descuento la factura debe quedar saldada: lo cobrado más el descuento tiene que ser igual al saldo');
+            return;
+        }
         
         const pagoData = {
             factura_id: facturaId,
             monto: monto,
+            descuento: descuento,
+            justificacion_descuento: justificacion,
             metodo_pago: metodo,
             fecha_pago: new Date().toISOString().split('T')[0],
             observaciones: observaciones,
@@ -398,9 +415,9 @@ const App = {
         });
         
         // Update local factura
-        const factura = await this.dbGet('facturas', facturaId);
+        const factura = facturaActual;
         if (factura) {
-            factura.saldo = Math.max(0, factura.saldo - monto);
+            factura.saldo = Math.max(0, saldo - monto - descuento);
             factura.estado = factura.saldo <= 0 ? 'pagada' : 'parcial';
             await this.dbPut('facturas', factura);
         }

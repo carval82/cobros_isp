@@ -66,9 +66,9 @@
                         <th>Cliente</th>
                         <th>Documento</th>
                         <th class="text-end">Facturado</th>
-                        <th class="text-end">Pagado</th>
-                        <th class="text-end">Saldo</th>
-                        <th>Estado factura</th>
+                        <th class="text-end">Cobrado en el mes</th>
+                        <th class="text-end">Saldo del mes</th>
+                        <th>Estado en el mes</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -84,8 +84,11 @@
                         <td class="text-end text-danger">${{ number_format($cliente['pendiente'], 0, ',', '.') }}</td>
                         <td>
                             @forelse($cliente['facturas'] as $factura)
-                                <span class="badge bg-{{ $factura['estado'] === 'pagada' ? 'success' : ($factura['estado'] === 'vencida' ? 'danger' : 'warning') }}">
+                                <span class="badge bg-{{ $factura['estado'] === 'pagada' ? 'success' : ($factura['estado'] === 'parcial' ? 'info' : ($factura['estado'] === 'anulada' ? 'secondary' : 'warning')) }}">
                                     {{ $factura['numero'] }} · {{ $factura['estado'] }}
+                                    @if(($factura['pagado_despues'] ?? 0) > 0)
+                                        · ${{ number_format($factura['pagado_despues'], 0, ',', '.') }} en el mes siguiente
+                                    @endif
                                 </span>
                             @empty
                                 <span class="text-muted">Sin factura del mes</span>

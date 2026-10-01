@@ -53,7 +53,7 @@
 
 <p class="text-muted mb-3">
     Asignación y cobros separados por proyecto. La proyección usa los clientes asignados a cada cobrador en <strong>{{ $informe['periodo'] }}</strong>.
-    El recaudo y la liquidación quedan con lo cobrado real, aunque no se haya cumplido la meta.
+    El recaudo es el dinero cobrado en el mes. Si una factura de este mes se paga después, aquí queda como parcial y el valor entra en la liquidación del mes en que se cobró.
 </p>
 
 <div class="row g-3 mb-4">
@@ -143,6 +143,9 @@
                                 @if($fila['liquidacion_id'])
                                     <a href="{{ route('liquidaciones.show', $fila['liquidacion_id']) }}" class="btn btn-outline-success" title="Ver liquidación">
                                         <i class="fas fa-file-invoice"></i>
+                                    </a>
+                                    <a href="{{ route('liquidaciones.edit', $fila['liquidacion_id']) }}" class="btn btn-outline-secondary" title="Editar liquidación">
+                                        <i class="fas fa-pen"></i>
                                     </a>
                                 @else
                                     <form action="{{ route('liquidaciones.informe.generar') }}" method="POST" class="d-inline">

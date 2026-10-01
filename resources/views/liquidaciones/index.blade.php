@@ -27,6 +27,16 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
+            <div class="col-md-2">
+                <select name="mes" class="form-select">
+                    @foreach($meses as $num => $nombre)
+                        <option value="{{ $num }}" {{ (int) $mes === (int) $num ? 'selected' : '' }}>{{ $nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="number" name="anio" class="form-control" value="{{ $anio }}" min="2020">
+            </div>
             <div class="col-md-3">
                 <select name="cobrador_id" class="form-select">
                     <option value="">Todos los cobradores</option>
@@ -45,8 +55,8 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search me-1"></i>Filtrar</button>
-                <a href="{{ route('liquidaciones.index') }}" class="btn btn-outline-secondary">Limpiar</a>
+                <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search me-1"></i>Ver mes</button>
+                <a href="{{ route('liquidaciones.index', ['todas' => 1]) }}" class="btn btn-outline-secondary">Todas</a>
             </div>
         </form>
     </div>
@@ -84,7 +94,8 @@
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ route('liquidaciones.show', $liquidacion) }}" class="btn btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                <a href="{{ route('liquidaciones.show', $liquidacion) }}" class="btn btn-outline-primary" title="Ver"><i class="fas fa-eye"></i></a>
+                                <a href="{{ route('liquidaciones.edit', $liquidacion) }}" class="btn btn-outline-secondary" title="Editar"><i class="fas fa-pen"></i></a>
                                 @if($liquidacion->estado == 'pendiente')
                                 <form action="{{ route('liquidaciones.pagar', $liquidacion) }}" method="POST" class="d-inline">
                                     @csrf

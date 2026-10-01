@@ -140,6 +140,26 @@ class Factura extends Model
         return 'https://wa.me/' . $tel . '?text=' . rawurlencode($texto);
     }
 
+    public function aplicarDescuento(float $descuento): void
+    {
+        if ($descuento <= 0) {
+            return;
+        }
+
+        $this->descuento = (float) $this->descuento + $descuento;
+        $this->total = max(0, (float) $this->subtotal - (float) $this->descuento + (float) $this->recargo);
+        $this->saldo = max(0, (float) $this->saldo - $descuento);
+
+        if ($this->saldo <= 0) {
+            $this->saldo = 0;
+            $this->estado = 'pagada';
+        } elseif ((float) $this->saldo < (float) $this->total) {
+            $this->estado = 'parcial';
+        }
+
+        $this->save();
+    }
+
     public function registrarPago(float $monto): void
     {
         $this->saldo -= $monto;

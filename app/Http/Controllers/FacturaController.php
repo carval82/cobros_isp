@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Factura;
 use App\Models\Servicio;
 use App\Models\Proyecto;
+use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -13,14 +15,68 @@ class FacturaController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Factura::with(['cliente', 'servicio.planServicio']);
+        $datos = $this->consultaFacturas($request);
+        $facturas = $datos['query']
+            ->orderBy('facturas.anio', 'desc')
+            ->orderBy('facturas.mes', 'desc')
+            ->orderBy('facturas.id', 'desc')
+            ->paginate(25)
+            ->withQueryString();
 
-        if ($request->filled('estado')) {
-            $query->where('estado', $request->estado);
-        }
+        return view('facturas.index', [
+            'facturas' => $facturas,
+            'proyectos' => $datos['proyectos'],
+            'meses' => $datos['meses'],
+            'resumen' => $datos['resumen'],
+            'consulta' => $datos['consulta'],
+        ]);
+    }
+
+    public function exportarExcel(Request $request)
+    {
+        $datos = $this->consultaFacturas($request);
+        $facturas = $this->facturasParaExportar($datos['query']);
+        $titulo = $this->tituloExportacion($request, $datos);
+        $xml = $this->excelFacturas($titulo, $facturas, $datos['consulta'], $datos['resumen']);
+        $nombre = $this->nombreArchivo($request, $datos, 'xls');
+
+        return response($xml, 200, [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$nombre.'"',
+        ]);
+    }
+
+    public function exportarPdf(Request $request)
+    {
+        $datos = $this->consultaFacturas($request);
+        $facturas = $this->facturasParaExportar($datos['query']);
+        $titulo = $this->tituloExportacion($request, $datos);
+        $pdf = Pdf::loadView('facturas.pdf.listado', [
+            'titulo' => $titulo,
+            'facturas' => $facturas,
+            'consulta' => $datos['consulta'],
+            'resumen' => $datos['resumen'],
+        ])->setPaper('letter', 'landscape');
+
+        return $pdf->download($this->nombreArchivo($request, $datos, 'pdf'));
+    }
+
+    private function consultaFacturas(Request $request): array
+    {
+        $pagadoEnMes = '(select coalesce(sum(pagos.monto), 0) from pagos where pagos.factura_id = facturas.id and pagos.deleted_at is null and month(pagos.fecha_pago) = facturas.mes and year(pagos.fecha_pago) = facturas.anio)';
+
+        $query = Factura::with(['cliente.proyecto', 'servicio.planServicio'])
+            ->select('facturas.*')
+            ->selectRaw("{$pagadoEnMes} as pagado_en_mes");
 
         if ($request->filled('mes') && $request->filled('anio')) {
-            $query->where('mes', $request->mes)->where('anio', $request->anio);
+            $query->where('facturas.mes', $request->mes)->where('facturas.anio', $request->anio);
+        }
+
+        if ($request->filled('proyecto_id')) {
+            $query->whereHas('cliente', function ($q) use ($request) {
+                $q->where('proyecto_id', $request->proyecto_id);
+            });
         }
 
         if ($request->filled('buscar')) {
@@ -31,13 +87,117 @@ class FacturaController extends Controller
             });
         }
 
-        $facturas = $query->orderBy('anio', 'desc')
-            ->orderBy('mes', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(25)
-            ->withQueryString();
+        $consulta = $request->filled('mes') && $request->filled('anio');
+        $resumen = null;
+        if ($consulta) {
+            $faltantes = (clone $query)
+                ->where('facturas.estado', '!=', 'anulada')
+                ->whereRaw("facturas.total > {$pagadoEnMes}");
+            $resumen = [
+                'facturas' => (clone $query)->count(),
+                'faltantes' => (clone $faltantes)->count(),
+                'saldo' => (float) (clone $faltantes)->reorder()->select(DB::raw("coalesce(sum(facturas.total - {$pagadoEnMes}), 0) as saldo_mes"))->value('saldo_mes'),
+            ];
+        }
 
-        return view('facturas.index', compact('facturas'));
+        if ($request->input('estado') === 'sin_pago') {
+            $query->where('facturas.estado', '!=', 'anulada')
+                ->whereRaw("facturas.total > {$pagadoEnMes}");
+        } elseif ($request->filled('estado')) {
+            $query->where('facturas.estado', $request->estado);
+        }
+
+        $proyectos = Proyecto::where('activo', true)->orderBy('nombre')->get();
+        $meses = LiquidacionProyectoService::meses();
+
+        return compact('query', 'consulta', 'resumen', 'proyectos', 'meses');
+    }
+
+    private function facturasParaExportar($query)
+    {
+        return $query->get()
+            ->sortBy(fn ($factura) => mb_strtolower($factura->cliente->nombre ?? ''))
+            ->values();
+    }
+
+    private function tituloExportacion(Request $request, array $datos): string
+    {
+        $partes = ['Facturas'];
+        if ($request->filled('proyecto_id')) {
+            $partes[] = $datos['proyectos']->firstWhere('id', (int) $request->proyecto_id)?->nombre ?? 'Proyecto';
+        }
+        if ($datos['consulta']) {
+            $partes[] = ($datos['meses'][(int) $request->mes] ?? $request->mes).' '.$request->anio;
+        }
+        if ($request->input('estado') === 'sin_pago') {
+            $partes[] = 'sin pago en el mes';
+        }
+
+        return implode(' · ', $partes);
+    }
+
+    private function nombreArchivo(Request $request, array $datos, string $extension): string
+    {
+        $partes = ['facturas'];
+        if ($request->filled('proyecto_id')) {
+            $nombre = $datos['proyectos']->firstWhere('id', (int) $request->proyecto_id)?->nombre ?? 'proyecto';
+            $partes[] = str($nombre)->slug('_');
+        }
+        if ($datos['consulta']) {
+            $partes[] = $request->anio.'-'.str_pad((string) $request->mes, 2, '0', STR_PAD_LEFT);
+        }
+        if ($request->input('estado') === 'sin_pago') {
+            $partes[] = 'sin-pago';
+        }
+
+        return implode('-', $partes).'.'.$extension;
+    }
+
+    private function excelFacturas(string $titulo, $facturas, bool $consulta, ?array $resumen): string
+    {
+        $filas = [
+            [$titulo],
+            [],
+        ];
+        if ($resumen) {
+            $filas[] = ['Faltan por pago', $resumen['faltantes'], 'de', $resumen['facturas'], 'Saldo del mes', $resumen['saldo']];
+            $filas[] = [];
+        }
+        $filas[] = ['Número', 'Cliente', 'Documento', 'Celular', 'Proyecto', 'Periodo', 'Total', $consulta ? 'Saldo del mes' : 'Saldo', 'Estado'];
+
+        foreach ($facturas as $factura) {
+            $saldo = $consulta
+                ? max(0, (float) $factura->total - (float) $factura->pagado_en_mes)
+                : (float) $factura->saldo;
+            $filas[] = [
+                $factura->numeroMostrar(),
+                $factura->cliente->nombre ?? '',
+                $factura->cliente->documento ?? '',
+                $factura->cliente->celular ?: ($factura->cliente->telefono ?? ''),
+                $factura->cliente->proyecto->nombre ?? 'Sin proyecto',
+                $factura->periodo,
+                (float) $factura->total,
+                $saldo,
+                ucfirst($factura->estado),
+            ];
+        }
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            .'<?mso-application progid="Excel.Sheet"?>'
+            .'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+            .'<Worksheet ss:Name="Facturas"><Table>';
+
+        foreach ($filas as $fila) {
+            $xml .= '<Row>';
+            foreach ($fila as $valor) {
+                $tipo = is_numeric($valor) && ! is_string($valor) ? 'Number' : 'String';
+                $texto = htmlspecialchars((string) $valor, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                $xml .= '<Cell><Data ss:Type="'.$tipo.'">'.$texto.'</Data></Cell>';
+            }
+            $xml .= '</Row>';
+        }
+
+        return $xml.'</Table></Worksheet></Workbook>';
     }
 
     public function create()

@@ -327,7 +327,9 @@ class CobradorAppController extends Controller
     {
         $request->validate([
             'factura_id' => 'required|exists:facturas,id',
-            'monto' => 'required|numeric|min:1',
+            'monto' => 'required|numeric|min:0',
+            'descuento' => 'nullable|numeric|min:0',
+            'justificacion_descuento' => 'nullable|string|max:500',
             'metodo_pago' => 'required|in:efectivo,transferencia,nequi,daviplata',
             'fecha_pago' => 'required|date',
             'observaciones' => 'nullable|string',
@@ -384,13 +386,44 @@ class CobradorAppController extends Controller
             ]);
         }
 
-        // Validar que la factura tenga saldo pendiente
+        $descuento = round((float) $request->input('descuento', 0), 2);
+        $monto = round((float) $request->monto, 2);
+        $justificacion = trim((string) $request->input('justificacion_descuento', ''));
+
+        if ($monto <= 0 && $descuento <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Indica el valor cobrado o el descuento',
+            ], 422);
+        }
+
+        if ($descuento > 0 && mb_strlen($justificacion) < 10) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El descuento debe justificarse con al menos 10 caracteres',
+            ], 422);
+        }
+
         if ($factura->saldo <= 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'Esta factura ya está pagada completamente',
                 'factura_estado' => $factura->estado,
             ], 400);
+        }
+
+        if ($descuento > 0 && abs(($monto + $descuento) - (float) $factura->saldo) > 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Con descuento la factura debe quedar saldada: el valor cobrado más el descuento tiene que ser igual al saldo',
+            ], 422);
+        }
+
+        if ($monto > (float) $factura->saldo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El valor cobrado es mayor al saldo',
+            ], 422);
         }
 
         $cobroAbierto = Cobro::firstOrCreate(
@@ -400,11 +433,17 @@ class CobradorAppController extends Controller
 
         DB::beginTransaction();
         try {
+            if ($descuento > 0) {
+                $factura->aplicarDescuento($descuento);
+            }
+
             $pago = Pago::create([
                 'factura_id' => $factura->id,
                 'cobro_id' => $cobroAbierto->id,
                 'cobrador_id' => $cobrador->id,
-                'monto' => $request->monto,
+                'monto' => $monto,
+                'descuento' => $descuento,
+                'justificacion_descuento' => $descuento > 0 ? $justificacion : null,
                 'fecha_pago' => $request->fecha_pago,
                 'metodo_pago' => $request->metodo_pago,
                 'notas' => $request->observaciones,

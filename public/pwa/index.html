@@ -437,7 +437,7 @@
                                     <label class="form-label">Monto a Pagar *</label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
-                                        <input type="number" class="form-control" id="pagoMonto" required>
+                                        <input type="number" class="form-control" id="pagoMonto" min="0" step="1" required>
                                     </div>
                                 </div>
                                 <div class="mb-3">
@@ -448,6 +448,18 @@
                                         <option value="nequi">Nequi</option>
                                         <option value="daviplata">Daviplata</option>
                                     </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Descuento</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="pagoDescuento" min="0" step="1" value="0">
+                                    </div>
+                                    <small class="text-muted">Si hay descuento, el valor cobrado más el descuento debe ser igual al saldo. La factura queda saldada.</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Justificación del descuento</label>
+                                    <textarea class="form-control" id="pagoJustificacion" rows="2" placeholder="Obligatoria si hay descuento"></textarea>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Observaciones</label>

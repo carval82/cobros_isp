@@ -17,6 +17,8 @@ class Pago extends Model
         'cobro_id',
         'fecha_pago',
         'monto',
+        'descuento',
+        'justificacion_descuento',
         'metodo_pago',
         'referencia_pago',
         'notas',
@@ -26,6 +28,7 @@ class Pago extends Model
     protected $casts = [
         'fecha_pago' => 'date',
         'monto' => 'decimal:2',
+        'descuento' => 'decimal:2',
     ];
 
     public function factura(): BelongsTo

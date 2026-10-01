@@ -68,6 +68,7 @@ class CobradorInformeService
                     ->where('mes', $mes)
                     ->where('anio', $anio)
                     ->get();
+                $cortes = $this->cortesDelMes($facturas, $mes, $anio);
 
                 return [
                     'id' => $cliente->id,
@@ -79,13 +80,16 @@ class CobradorInformeService
                     'proyecto' => $cliente->proyecto?->nombre ?? 'Sin proyecto',
                     'proyecto_color' => $cliente->proyecto?->color ?? '#64748b',
                     'proyectado' => (float) $facturas->sum('total'),
-                    'pendiente' => (float) $facturas->sum('saldo'),
-                    'recaudado' => (float) $facturas->sum(fn ($f) => $f->total - $f->saldo),
-                    'facturas' => $facturas->map(fn ($f) => [
-                        'numero' => $f->numero,
-                        'total' => (float) $f->total,
-                        'saldo' => (float) $f->saldo,
-                        'estado' => $f->estado,
+                    'pendiente' => $cortes->sum('pendiente_mes'),
+                    'recaudado' => $cortes->sum('pagado_mes'),
+                    'pagado_despues' => $cortes->sum('pagado_despues'),
+                    'facturas' => $cortes->map(fn ($f) => [
+                        'numero' => $f['numero'],
+                        'total' => $f['total'],
+                        'saldo' => $f['pendiente_mes'],
+                        'pagado_mes' => $f['pagado_mes'],
+                        'pagado_despues' => $f['pagado_despues'],
+                        'estado' => $f['estado_mes'],
                     ]),
                 ];
             });
@@ -167,6 +171,30 @@ class CobradorInformeService
         });
     }
 
+    public function recalcular(Liquidacion $liquidacion): Liquidacion
+    {
+        $desde = $liquidacion->fecha_desde->toDateString();
+        $hasta = $liquidacion->fecha_hasta->toDateString();
+        $cobrador = $liquidacion->cobrador;
+
+        $totalRecaudado = (float) Pago::where('cobrador_id', $liquidacion->cobrador_id)
+            ->whereBetween('fecha_pago', [$desde, $hasta])
+            ->sum('monto');
+        $totalComision = round($totalRecaudado * ((float) $cobrador->comision_porcentaje / 100), 2);
+        $cantidadPagos = (int) Pago::where('cobrador_id', $liquidacion->cobrador_id)
+            ->whereBetween('fecha_pago', [$desde, $hasta])
+            ->count();
+
+        $liquidacion->update([
+            'total_recaudado' => $totalRecaudado,
+            'total_comision' => $totalComision,
+            'total_a_entregar' => $totalRecaudado - $totalComision,
+            'cantidad_pagos' => $cantidadPagos,
+        ]);
+
+        return $liquidacion->fresh();
+    }
+
     private function filaCobrador(Cobrador $cobrador, int $mes, int $anio, Carbon $desde, Carbon $hasta): array
     {
         $clientes = $cobrador->clientes()
@@ -178,7 +206,9 @@ class CobradorInformeService
         $facturas = Factura::whereIn('cliente_id', $clienteIds)
             ->where('mes', $mes)
             ->where('anio', $anio)
-            ->get(['id', 'cliente_id', 'total', 'saldo']);
+            ->get(['id', 'cliente_id', 'numero', 'total', 'saldo', 'estado', 'mes', 'anio']);
+
+        $cortes = $this->cortesDelMes($facturas, $mes, $anio)->keyBy('id');
 
         $pagos = Pago::where('cobrador_id', $cobrador->id)
             ->whereMonth('fecha_pago', $mes)
@@ -195,6 +225,7 @@ class CobradorInformeService
             ->map(function ($grupo, $proyectoId) use ($facturas, $pagos, $proyectos) {
                 $ids = $grupo->pluck('id');
                 $facts = $facturas->whereIn('cliente_id', $ids);
+                $cortesGrupo = $cortes->whereIn('id', $facts->pluck('id'));
                 $recs = $pagos->filter(fn (Pago $pago) => $ids->contains($pago->factura?->cliente_id));
                 $proyecto = $proyectos->get((int) $proyectoId);
 
@@ -204,7 +235,7 @@ class CobradorInformeService
                     'color' => $proyecto?->color ?? '#64748b',
                     'clientes' => $grupo->count(),
                     'proyectado' => (float) $facts->sum('total'),
-                    'pendiente' => (float) $facts->sum('saldo'),
+                    'pendiente' => (float) $cortesGrupo->sum('pendiente_mes'),
                     'recaudado' => (float) $recs->sum('monto'),
                 ];
             })
@@ -212,8 +243,8 @@ class CobradorInformeService
             ->values();
 
         $proyectado = (float) $facturas->sum('total');
-        $pendiente = (float) $facturas->sum('saldo');
-        $recaudadoCartera = (float) $facturas->sum(fn ($f) => $f->total - $f->saldo);
+        $pendiente = (float) $cortes->sum('pendiente_mes');
+        $recaudadoCartera = (float) $cortes->sum('pagado_mes');
         $recaudado = (float) $pagos->sum('monto');
         $comision = round($recaudado * ((float) $cobrador->comision_porcentaje / 100), 2);
         $cumplimiento = $proyectado > 0 ? round(($recaudadoCartera / $proyectado) * 100, 1) : 0;
@@ -241,5 +272,49 @@ class CobradorInformeService
             'liquidacion_estado' => $liquidacion?->estado,
             'proyectos' => $proyectosFila,
         ];
+    }
+
+    private function cortesDelMes($facturas, int $mes, int $anio)
+    {
+        $finMes = Carbon::create($anio, $mes, 1)->endOfMonth()->endOfDay();
+        $pagos = $facturas->isEmpty()
+            ? collect()
+            : Pago::whereIn('factura_id', $facturas->pluck('id'))->get(['factura_id', 'monto', 'fecha_pago']);
+
+        return $facturas->map(function (Factura $factura) use ($pagos, $finMes, $mes, $anio) {
+            $delMes = $pagos->filter(function (Pago $pago) use ($factura, $mes, $anio) {
+                return (int) $pago->factura_id === (int) $factura->id
+                    && (int) $pago->fecha_pago->month === $mes
+                    && (int) $pago->fecha_pago->year === $anio;
+            });
+            $despues = $pagos->filter(function (Pago $pago) use ($factura, $finMes) {
+                return (int) $pago->factura_id === (int) $factura->id
+                    && $pago->fecha_pago->gt($finMes);
+            });
+
+            $pagadoMes = (float) $delMes->sum('monto');
+            $pagadoDespues = (float) $despues->sum('monto');
+            $pendienteMes = max(0, (float) $factura->total - $pagadoMes);
+
+            if ($pagadoMes <= 0 && $pagadoDespues > 0) {
+                $estado = 'parcial';
+            } elseif ($pagadoMes <= 0) {
+                $estado = $factura->estado === 'anulada' ? 'anulada' : 'pendiente';
+            } elseif ($pendienteMes <= 0.5) {
+                $estado = 'pagada';
+            } else {
+                $estado = 'parcial';
+            }
+
+            return [
+                'id' => $factura->id,
+                'numero' => $factura->numero,
+                'total' => (float) $factura->total,
+                'pagado_mes' => $pagadoMes,
+                'pagado_despues' => $pagadoDespues,
+                'pendiente_mes' => $pendienteMes,
+                'estado_mes' => $estado,
+            ];
+        });
     }
 }

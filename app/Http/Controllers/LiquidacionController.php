@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Liquidacion;
 use App\Models\Cobrador;
 use App\Models\Cobro;
+use App\Models\Pago;
 use App\Services\CobradorInformeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,20 +14,37 @@ class LiquidacionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Liquidacion::with('cobrador');
+        $mes = (int) $request->input('mes', now()->month);
+        $anio = (int) $request->input('anio', now()->year);
+        $verTodas = $request->boolean('todas');
+
+        $query = Liquidacion::query()
+            ->select('liquidacions.*')
+            ->join('cobradors', 'cobradors.id', '=', 'liquidacions.cobrador_id')
+            ->with('cobrador');
+
+        if (! $verTodas) {
+            $query->whereMonth('liquidacions.fecha_desde', $mes)
+                ->whereYear('liquidacions.fecha_desde', $anio);
+        }
 
         if ($request->filled('cobrador_id')) {
-            $query->where('cobrador_id', $request->cobrador_id);
+            $query->where('liquidacions.cobrador_id', $request->cobrador_id);
         }
 
         if ($request->filled('estado')) {
-            $query->where('estado', $request->estado);
+            $query->where('liquidacions.estado', $request->estado);
         }
 
-        $liquidaciones = $query->orderBy('fecha_liquidacion', 'desc')->paginate(25);
+        $liquidaciones = $query
+            ->orderByDesc('liquidacions.fecha_desde')
+            ->orderBy('cobradors.nombre')
+            ->paginate(25)
+            ->withQueryString();
         $cobradores = Cobrador::where('estado', 'activo')->orderBy('nombre')->get();
+        $meses = CobradorInformeService::meses();
 
-        return view('liquidaciones.index', compact('liquidaciones', 'cobradores'));
+        return view('liquidaciones.index', compact('liquidaciones', 'cobradores', 'meses', 'mes', 'anio', 'verTodas'));
     }
 
     public function create()
@@ -96,7 +114,20 @@ class LiquidacionController extends Controller
     public function show(Liquidacion $liquidacione)
     {
         $liquidacione->load(['cobrador', 'cobros.pagos']);
-        return view('liquidaciones.show', ['liquidacion' => $liquidacione]);
+        $pagos = Pago::with(['factura.cliente'])
+            ->where('cobrador_id', $liquidacione->cobrador_id)
+            ->whereBetween('fecha_pago', [
+                $liquidacione->fecha_desde->toDateString(),
+                $liquidacione->fecha_hasta->toDateString(),
+            ])
+            ->orderBy('fecha_pago')
+            ->orderBy('id')
+            ->get();
+
+        return view('liquidaciones.show', [
+            'liquidacion' => $liquidacione,
+            'pagos' => $pagos,
+        ]);
     }
 
     public function edit(Liquidacion $liquidacione)
@@ -107,13 +138,28 @@ class LiquidacionController extends Controller
     public function update(Request $request, Liquidacion $liquidacione)
     {
         $validated = $request->validate([
+            'total_recaudado' => 'required|numeric|min:0',
+            'total_comision' => 'required|numeric|min:0',
             'observaciones' => 'nullable|string',
         ]);
 
-        $liquidacione->update($validated);
+        $liquidacione->update([
+            'total_recaudado' => $validated['total_recaudado'],
+            'total_comision' => $validated['total_comision'],
+            'total_a_entregar' => $validated['total_recaudado'] - $validated['total_comision'],
+            'observaciones' => $validated['observaciones'] ?? null,
+        ]);
 
         return redirect()->route('liquidaciones.show', $liquidacione)
             ->with('success', 'Liquidación actualizada correctamente');
+    }
+
+    public function recalcular(Liquidacion $liquidacion, CobradorInformeService $service)
+    {
+        $service->recalcular($liquidacion);
+
+        return redirect()->route('liquidaciones.show', $liquidacion)
+            ->with('success', 'Liquidación recalculada con los pagos del período');
     }
 
     public function destroy(Liquidacion $liquidacione)

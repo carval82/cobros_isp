@@ -41,6 +41,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('cobradores', CobradorController::class);
     Route::resource('planes', PlanServicioController::class);
     Route::resource('servicios', ServicioController::class);
+    Route::get('facturas/exportar-excel', [FacturaController::class, 'exportarExcel'])->name('facturas.exportar.excel');
+    Route::get('facturas/exportar-pdf', [FacturaController::class, 'exportarPdf'])->name('facturas.exportar.pdf');
     Route::resource('facturas', FacturaController::class);
     Route::resource('cobros', CobroController::class);
     Route::resource('pagos', PagoController::class);
@@ -57,6 +59,7 @@ Route::middleware('auth')->group(function () {
     Route::post('facturas/{factura}/whatsapp', [FacturaController::class, 'enviarWhatsapp'])->name('facturas.whatsapp');
     Route::post('facturas/{factura}/alegra', [FacturaController::class, 'causarAlegra'])->name('facturas.alegra');
     Route::post('liquidaciones/{liquidacion}/pagar', [LiquidacionController::class, 'pagar'])->name('liquidaciones.pagar');
+    Route::post('liquidaciones/{liquidacion}/recalcular', [LiquidacionController::class, 'recalcular'])->name('liquidaciones.recalcular');
 
     Route::get('liquidaciones-socios', [LiquidacionSocioController::class, 'index'])->name('liquidaciones.socios');
     Route::get('liquidaciones-socios/{proyecto}', [LiquidacionSocioController::class, 'show'])->name('liquidaciones.socios.show');

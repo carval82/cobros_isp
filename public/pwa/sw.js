@@ -1,5 +1,5 @@
 // Service Worker for INTERVEREDANET Cobrador PWA
-const CACHE_NAME = 'interveredanet-cobrador-v1';
+const CACHE_NAME = 'interveredanet-cobrador-v2';
 const urlsToCache = [
     '/pwa/',
     '/pwa/index.html',

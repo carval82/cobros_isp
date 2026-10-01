@@ -27,12 +27,20 @@
             <div class="col-md-3">
                 <input type="text" name="buscar" class="form-control" placeholder="Buscar cliente..." value="{{ request('buscar') }}">
             </div>
+            <div class="col-md-3">
+                <select name="proyecto_id" class="form-select">
+                    <option value="">Todos los proyectos</option>
+                    @foreach($proyectos as $proyecto)
+                        <option value="{{ $proyecto->id }}" {{ request('proyecto_id') == $proyecto->id ? 'selected' : '' }}>{{ $proyecto->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
             <div class="col-md-2">
                 <select name="mes" class="form-select">
                     <option value="">Mes</option>
-                    @for($i = 1; $i <= 12; $i++)
-                        <option value="{{ $i }}" {{ request('mes') == $i ? 'selected' : '' }}>{{ $i }}</option>
-                    @endfor
+                    @foreach($meses as $num => $nombre)
+                        <option value="{{ $num }}" {{ request('mes') == $num ? 'selected' : '' }}>{{ $nombre }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="col-md-2">
@@ -46,19 +54,39 @@
             <div class="col-md-2">
                 <select name="estado" class="form-select">
                     <option value="">Estado</option>
+                    <option value="sin_pago" {{ request('estado') == 'sin_pago' ? 'selected' : '' }}>Sin pago en el mes</option>
                     <option value="pendiente" {{ request('estado') == 'pendiente' ? 'selected' : '' }}>Pendiente</option>
                     <option value="pagada" {{ request('estado') == 'pagada' ? 'selected' : '' }}>Pagada</option>
                     <option value="parcial" {{ request('estado') == 'parcial' ? 'selected' : '' }}>Parcial</option>
                     <option value="vencida" {{ request('estado') == 'vencida' ? 'selected' : '' }}>Vencida</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-6">
                 <button type="submit" class="btn btn-outline-primary">
                     <i class="fas fa-search me-1"></i>Filtrar
                 </button>
                 <a href="{{ route('facturas.index') }}" class="btn btn-outline-secondary">Limpiar</a>
+                <button type="submit" class="btn btn-success" formaction="{{ route('facturas.exportar.excel') }}">
+                    <i class="fas fa-file-excel me-1"></i>Excel
+                </button>
+                <button type="submit" class="btn btn-danger" formaction="{{ route('facturas.exportar.pdf') }}">
+                    <i class="fas fa-file-pdf me-1"></i>PDF
+                </button>
             </div>
         </form>
+        @if($resumen)
+        <div class="alert alert-warning mt-3 mb-0">
+            En {{ $meses[(int) request('mes')] }} {{ request('anio') }}
+            @if(request('proyecto_id'))
+                · {{ $proyectos->firstWhere('id', (int) request('proyecto_id'))?->nombre }}
+            @endif
+            faltan <strong>{{ $resumen['faltantes'] }}</strong> de {{ $resumen['facturas'] }} facturas por pago.
+            Saldo de ese mes: <strong>${{ number_format($resumen['saldo'], 0, ',', '.') }}</strong>.
+            @if(request('estado') !== 'sin_pago')
+                <a href="{{ route('facturas.index', array_merge(request()->query(), ['estado' => 'sin_pago'])) }}">Ver solo quienes faltan</a>
+            @endif
+        </div>
+        @endif
     </div>
 </div>
 
@@ -70,9 +98,10 @@
                     <tr>
                         <th>Número</th>
                         <th>Cliente</th>
+                        <th>Proyecto</th>
                         <th>Periodo</th>
                         <th class="text-end">Total</th>
-                        <th class="text-end">Saldo</th>
+                        <th class="text-end">{{ $consulta ? 'Saldo del mes' : 'Saldo' }}</th>
                         <th class="text-center">Estado</th>
                         <th class="text-center">Acciones</th>
                     </tr>
@@ -87,10 +116,16 @@
                             @endif
                         </td>
                         <td><a href="{{ route('clientes.show', $factura->cliente_id) }}">{{ $factura->cliente->nombre }}</a></td>
+                        <td>{{ $factura->cliente->proyecto->nombre ?? 'Sin proyecto' }}</td>
                         <td>{{ $factura->periodo }}</td>
                         <td class="text-end">${{ number_format($factura->total, 0, ',', '.') }}</td>
-                        <td class="text-end {{ $factura->saldo > 0 ? 'text-danger fw-bold' : 'text-success' }}">
-                            ${{ number_format($factura->saldo, 0, ',', '.') }}
+                        @php
+                            $saldoMes = $consulta
+                                ? max(0, (float) $factura->total - (float) $factura->pagado_en_mes)
+                                : (float) $factura->saldo;
+                        @endphp
+                        <td class="text-end {{ $saldoMes > 0 ? 'text-danger fw-bold' : 'text-success' }}">
+                            ${{ number_format($saldoMes, 0, ',', '.') }}
                         </td>
                         <td class="text-center">
                             @switch($factura->estado)
@@ -137,7 +172,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">No hay facturas</td>
+                        <td colspan="8" class="text-center py-4 text-muted">No hay facturas</td>
                     </tr>
                     @endforelse
                 </tbody>

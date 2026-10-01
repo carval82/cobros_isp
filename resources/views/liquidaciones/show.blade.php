@@ -16,7 +16,16 @@
             </button>
         </form>
         @endif
-        <a href="{{ route('liquidaciones.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('liquidaciones.edit', $liquidacion) }}" class="btn btn-outline-primary">
+            <i class="fas fa-pen me-1"></i>Editar
+        </a>
+        <form action="{{ route('liquidaciones.recalcular', $liquidacion) }}" method="POST" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="fas fa-sync me-1"></i>Recalcular
+            </button>
+        </form>
+        <a href="{{ route('liquidaciones.index', ['mes' => $liquidacion->fecha_desde->month, 'anio' => $liquidacion->fecha_desde->year]) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>Volver
         </a>
     </div>
@@ -112,6 +121,42 @@
                             <td class="text-center">{{ $liquidacion->cantidad_pagos }}</td>
                         </tr>
                     </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="fas fa-receipt me-2"></i>Pagos del período
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Factura</th>
+                            <th class="text-end">Cobrado</th>
+                            <th class="text-end">Descuento</th>
+                            <th>Justificación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($pagos as $pago)
+                        <tr>
+                            <td>{{ $pago->fecha_pago->format('d/m/Y') }}</td>
+                            <td>{{ $pago->factura->cliente->nombre ?? '—' }}</td>
+                            <td>{{ $pago->factura->numero ?? '—' }}</td>
+                            <td class="text-end">${{ number_format($pago->monto, 0, ',', '.') }}</td>
+                            <td class="text-end">{{ $pago->descuento > 0 ? '$'.number_format($pago->descuento, 0, ',', '.') : '—' }}</td>
+                            <td class="small">{{ $pago->justificacion_descuento ?: '—' }}</td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="6" class="text-center py-3 text-muted">No hay pagos en este período</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
                 </table>
             </div>
         </div>
