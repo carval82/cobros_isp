@@ -13,6 +13,10 @@
     </div>
 </div>
 
+@if ($errors->any())
+    <div class="alert alert-danger">{{ $errors->first() }}</div>
+@endif
+
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3 align-items-end">
@@ -42,6 +46,7 @@
                 <a href="{{ route('gastos.index') }}" class="btn btn-outline-secondary">Limpiar</a>
             </div>
         </form>
+        <p class="text-muted small mb-0 mt-3">Hasta el día {{ \App\Services\AtribucionPago::DIAS_GRACIA }} se trabaja el mes anterior. Los gastos de {{ $meses[(int) $mes] ?? $mes }} {{ $anio }} se guardan en esa liquidación, aunque hoy sea otro mes.</p>
     </div>
 </div>
 
@@ -67,7 +72,7 @@
                 <tbody>
                     @forelse($gastos as $gasto)
                     <tr>
-                        <td>{{ $gasto->fecha->format('d/m/Y') }}</td>
+                        <td>{{ $gasto->fecha?->format('d/m/Y') ?? '—' }}</td>
                         <td>{{ $gasto->proyecto->nombre ?? '—' }}</td>
                         <td>{{ $categorias[$gasto->categoria] ?? $gasto->categoria }}</td>
                         <td>{{ $gasto->descripcion }}</td>
@@ -101,6 +106,8 @@
                 <h5 class="modal-title">Registrar gasto</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+            <input type="hidden" name="mes" value="{{ $mes }}">
+            <input type="hidden" name="anio" value="{{ $anio }}">
             <div class="modal-body row g-3">
                 <div class="col-12">
                     <label class="form-label">Proyecto *</label>
@@ -120,8 +127,13 @@
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Fecha *</label>
-                    <input type="date" name="fecha" class="form-control" value="{{ now()->toDateString() }}" required>
+                    <label class="form-label">Fecha en {{ $meses[(int) $mes] ?? $mes }} *</label>
+                    @php
+                        $inicioMes = \Carbon\Carbon::create((int) $anio, (int) $mes, 1);
+                        $finMes = $inicioMes->copy()->endOfMonth();
+                    @endphp
+                    <input type="date" name="fecha" class="form-control" min="{{ $inicioMes->format('Y-m-d') }}" max="{{ $finMes->format('Y-m-d') }}" value="{{ old('fecha', $fechaSugerida) }}" required>
+                    <div class="form-text">Queda en {{ $meses[(int) $mes] ?? $mes }} {{ $anio }}.</div>
                 </div>
                 <div class="col-12">
                     <label class="form-label">Descripción *</label>

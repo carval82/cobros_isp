@@ -201,8 +201,7 @@ class AdminAppController extends Controller
 
     public function dashboard(Request $request)
     {
-        $mes = now()->month;
-        $anio = now()->year;
+        [$mes, $anio] = AtribucionPago::mesGestion();
 
         $totalClientes = Cliente::where('estado', 'activo')->count();
         $totalCobradores = Cobrador::where('estado', 'activo')->count();
@@ -236,6 +235,11 @@ class AdminAppController extends Controller
                 ],
                 'tickets_pendientes' => $ticketsPendientes,
                 'tickets_nuevos' => $ticketsNuevos,
+                'periodo' => [
+                    'mes' => $mes,
+                    'anio' => $anio,
+                    'nombre' => (LiquidacionProyectoService::meses()[$mes] ?? $mes).' '.$anio,
+                ],
             ],
         ]);
     }
@@ -792,7 +796,7 @@ class AdminAppController extends Controller
                     'monto' => $monto,
                     'descuento' => $descuento,
                     'justificacion_descuento' => $descuento > 0 ? $justificacion : null,
-                    'fecha_pago' => now(),
+                    'fecha_pago' => AtribucionPago::fechaCausacion((int) $factura->mes, (int) $factura->anio, now()),
                     'metodo_pago' => $request->metodo_pago,
                     'notas' => $request->observaciones,
                 ]);
@@ -1005,11 +1009,11 @@ class AdminAppController extends Controller
         $proyecto = Proyecto::findOrFail($proyectoId);
         
         $query = GastoProyecto::where('proyecto_id', $proyectoId);
-        
-        if ($request->mes && $request->anio) {
-            $query->whereMonth('fecha', $request->mes)
-                  ->whereYear('fecha', $request->anio);
-        }
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->mes : null,
+            $request->filled('anio') ? (int) $request->anio : null
+        );
+        $query->whereMonth('fecha', $mes)->whereYear('fecha', $anio);
         
         if ($request->categoria) {
             $query->where('categoria', $request->categoria);
@@ -1023,7 +1027,7 @@ class AdminAppController extends Controller
                 'categoria_nombre' => GastoProyecto::categorias()[$g->categoria] ?? $g->categoria,
                 'descripcion' => $g->descripcion,
                 'monto' => $g->monto,
-                'fecha' => $g->fecha->format('Y-m-d'),
+                'fecha' => $g->fecha?->format('Y-m-d'),
                 'proveedor' => $g->proveedor,
                 'factura_numero' => $g->factura_numero,
                 'notas' => $g->notas,
@@ -1039,6 +1043,11 @@ class AdminAppController extends Controller
             ],
             'gastos' => $gastos,
             'total_gastos' => $totalGastos,
+            'periodo' => [
+                'mes' => $mes,
+                'anio' => $anio,
+                'nombre' => (LiquidacionProyectoService::meses()[$mes] ?? $mes).' '.$anio,
+            ],
             'categorias' => GastoProyecto::categorias(),
         ]);
     }
@@ -1049,29 +1058,43 @@ class AdminAppController extends Controller
             'proyecto_id' => 'required|exists:proyectos,id',
             'categoria' => 'required|string|max:50',
             'descripcion' => 'required|string|max:255',
-            'monto' => 'required|numeric|min:0',
-            'fecha' => 'required|date',
+            'monto' => 'required|numeric|min:1',
+            'fecha' => 'nullable|date',
+            'mes' => 'nullable|integer|min:1|max:12',
+            'anio' => 'nullable|integer|min:2020|max:2035',
             'proveedor' => 'nullable|string|max:255',
             'factura_numero' => 'nullable|string|max:50',
             'notas' => 'nullable|string',
         ]);
+
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->mes : null,
+            $request->filled('anio') ? (int) $request->anio : null
+        );
+        $fecha = \Carbon\Carbon::parse(AtribucionPago::fechaEnMes($mes, $anio, $request->fecha));
 
         $gasto = GastoProyecto::create([
             'proyecto_id' => $request->proyecto_id,
             'categoria' => $request->categoria,
             'descripcion' => $request->descripcion,
             'monto' => $request->monto,
-            'fecha' => $request->fecha,
+            'fecha' => $fecha->toDateString(),
             'proveedor' => $request->proveedor,
             'factura_numero' => $request->factura_numero,
             'notas' => $request->notas,
             'registrado_por' => $request->user()?->id,
         ]);
 
+        $nombreMes = LiquidacionProyectoService::meses()[(int) $fecha->month] ?? $fecha->month;
+
         return response()->json([
             'success' => true,
-            'message' => 'Gasto registrado exitosamente',
+            'message' => 'Gasto registrado en '.$nombreMes.' '.$fecha->year.'.',
             'gasto' => $gasto,
+            'periodo' => [
+                'mes' => (int) $fecha->month,
+                'anio' => (int) $fecha->year,
+            ],
         ]);
     }
 
@@ -1115,8 +1138,10 @@ class AdminAppController extends Controller
             $q->where('estado', 'activo');
         }])->findOrFail($proyectoId);
         
-        $mes = $request->mes ?? now()->month;
-        $anio = $request->anio ?? now()->year;
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->mes : null,
+            $request->filled('anio') ? (int) $request->anio : null
+        );
 
         // Ingresos del mes (pagos recibidos)
         $ingresos = AtribucionPago::aplicar(
@@ -1224,8 +1249,10 @@ class AdminAppController extends Controller
 
     public function liquidacionProyecto(Request $request, $proyectoId)
     {
-        $mes = (int) ($request->mes ?? now()->month);
-        $anio = (int) ($request->anio ?? now()->year);
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->mes : null,
+            $request->filled('anio') ? (int) $request->anio : null
+        );
         $proyecto = Proyecto::findOrFail($proyectoId);
         $informe = app(LiquidacionProyectoService::class)->calcular($proyecto, $mes, $anio);
 
@@ -1239,7 +1266,8 @@ class AdminAppController extends Controller
             'periodo' => [
                 'mes' => $mes,
                 'anio' => $anio,
-                'nombre_mes' => $informe['periodo']['nombre'],
+                'nombre_mes' => LiquidacionProyectoService::meses()[$mes] ?? $mes,
+                'nombre' => $informe['periodo']['nombre'],
             ],
             'resumen' => [
                 'a_cobrar' => $informe['a_cobrar'],
@@ -1258,12 +1286,13 @@ class AdminAppController extends Controller
                     'items' => $cat['items']->map(fn ($g) => [
                         'descripcion' => $g->descripcion,
                         'monto' => $g->monto,
-                        'fecha' => $g->fecha->format('Y-m-d'),
+                        'fecha' => $g->fecha?->format('Y-m-d'),
                         'proveedor' => $g->proveedor,
                     ])->values(),
                 ];
             })->values(),
             'detalle_comisiones' => $informe['comisiones_detalle'],
+            'categorias' => GastoProyecto::categorias(),
             'distribucion_socios' => $informe['socios']->map(fn ($s) => [
                 'socio' => $s['socio'],
                 'documento' => $s['documento'],

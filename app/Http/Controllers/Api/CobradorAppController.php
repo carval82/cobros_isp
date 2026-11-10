@@ -10,6 +10,7 @@ use App\Models\Pago;
 use App\Models\Cobro;
 use App\Models\Servicio;
 use App\Models\PlanServicio;
+use App\Services\AtribucionPago;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -364,11 +365,16 @@ class CobradorAppController extends Controller
             }
         }
 
-        // Validar pago duplicado: mismo cobrador, misma factura, mismo monto, mismo día
+        $fechaPago = AtribucionPago::fechaCausacion(
+            (int) $factura->mes,
+            (int) $factura->anio,
+            $request->fecha_pago
+        );
+
         $pagoDuplicado = Pago::where('factura_id', $factura->id)
             ->where('cobrador_id', $cobrador->id)
             ->where('monto', $request->monto)
-            ->whereDate('fecha_pago', $request->fecha_pago)
+            ->whereDate('fecha_pago', $fechaPago)
             ->first();
         
         if ($pagoDuplicado) {
@@ -426,10 +432,20 @@ class CobradorAppController extends Controller
             ], 422);
         }
 
-        $cobroAbierto = Cobro::firstOrCreate(
-            ['cobrador_id' => $cobrador->id, 'estado' => 'abierto'],
-            ['fecha' => now(), 'total_recaudado' => 0]
-        );
+        $inicioMes = Carbon::parse($fechaPago)->startOfMonth();
+        $finMes = $inicioMes->copy()->endOfMonth();
+        $cobroAbierto = Cobro::where('cobrador_id', $cobrador->id)
+            ->where('estado', 'abierto')
+            ->whereBetween('fecha', [$inicioMes->toDateString(), $finMes->toDateString()])
+            ->first();
+        if (! $cobroAbierto) {
+            $cobroAbierto = Cobro::create([
+                'cobrador_id' => $cobrador->id,
+                'estado' => 'abierto',
+                'fecha' => $fechaPago,
+                'total_recaudado' => 0,
+            ]);
+        }
 
         DB::beginTransaction();
         try {
@@ -444,7 +460,7 @@ class CobradorAppController extends Controller
                 'monto' => $monto,
                 'descuento' => $descuento,
                 'justificacion_descuento' => $descuento > 0 ? $justificacion : null,
-                'fecha_pago' => $request->fecha_pago,
+                'fecha_pago' => $fechaPago,
                 'metodo_pago' => $request->metodo_pago,
                 'notas' => $request->observaciones,
                 'referencia_pago' => $request->offline_id ? 'OFFLINE-' . $request->offline_id : null,

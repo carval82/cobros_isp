@@ -14,13 +14,13 @@
 
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link active" href="{{ route('liquidaciones.index') }}">Cobradores</a>
+        <a class="nav-link active" href="{{ route('liquidaciones.index', ['mes' => $mes, 'anio' => $anio]) }}">Cobradores</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ route('liquidaciones.informe') }}">Proyección e informe</a>
+        <a class="nav-link" href="{{ route('liquidaciones.informe', ['mes' => $mes, 'anio' => $anio]) }}">Proyección e informe</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ route('liquidaciones.socios') }}">Socios por proyecto</a>
+        <a class="nav-link" href="{{ route('liquidaciones.socios', ['mes' => $mes, 'anio' => $anio]) }}">Socios por proyecto</a>
     </li>
 </ul>
 
@@ -59,6 +59,7 @@
                 <a href="{{ route('liquidaciones.index', ['todas' => 1]) }}" class="btn btn-outline-secondary">Todas</a>
             </div>
         </form>
+        <p class="text-muted small mb-0 mt-3">Hasta el día {{ \App\Services\AtribucionPago::DIAS_GRACIA }} se muestra {{ $meses[(int) $mes] ?? $mes }} {{ $anio }}. Si aún no se generó la liquidación del cobrador, abajo aparece lo cobrado de ese mes.</p>
     </div>
 </div>
 
@@ -108,7 +109,12 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="text-center py-4 text-muted">No hay liquidaciones</td></tr>
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            No hay liquidaciones guardadas de {{ $meses[(int) $mes] ?? $mes }} {{ $anio }}.
+                            <a href="{{ route('liquidaciones.informe', ['mes' => $mes, 'anio' => $anio]) }}">Ver la proyección de ese mes</a>
+                        </td>
+                    </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -116,4 +122,49 @@
     </div>
     @if($liquidaciones->hasPages())<div class="card-footer">{{ $liquidaciones->withQueryString()->links() }}</div>@endif
 </div>
+
+@if(!$verTodas && $informe)
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Cobrado en {{ $informe['periodo'] }}</span>
+        <a href="{{ route('liquidaciones.informe', ['mes' => $mes, 'anio' => $anio]) }}" class="btn btn-sm btn-outline-primary">Ver informe completo</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Cobrador</th>
+                        <th class="text-end">Cobró</th>
+                        <th class="text-end">Pendiente</th>
+                        <th class="text-end">Comisión</th>
+                        <th class="text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($informe['cobradores'] as $fila)
+                    <tr>
+                        <td>{{ $fila['nombre'] }}</td>
+                        <td class="text-end text-success">${{ number_format((float) ($fila['recaudado'] ?? 0), 0, ',', '.') }}</td>
+                        <td class="text-end text-danger">${{ number_format((float) ($fila['pendiente'] ?? 0), 0, ',', '.') }}</td>
+                        <td class="text-end">${{ number_format((float) ($fila['comision'] ?? 0), 0, ',', '.') }}</td>
+                        <td class="text-center">
+                            @if($fila['liquidacion_id'])
+                                <a href="{{ route('liquidaciones.show', $fila['liquidacion_id']) }}" class="badge bg-{{ ($fila['liquidacion_estado'] ?? '') === 'pagada' ? 'success' : 'warning' }} text-decoration-none">
+                                    {{ ucfirst((string) ($fila['liquidacion_estado'] ?? 'pendiente')) }}
+                                </a>
+                            @else
+                                <span class="badge bg-secondary">Sin generar</span>
+                            @endif
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="5" class="text-center py-3 text-muted">No hay cobradores activos</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endif
 @endsection

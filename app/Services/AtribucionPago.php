@@ -50,6 +50,66 @@ class AtribucionPago
         });
     }
 
+    public static function mesGestion(?int $mes = null, ?int $anio = null): array
+    {
+        $hoy = now();
+        if ($mes && $mes >= 1 && $mes <= 12) {
+            if (! $anio || $anio < 2020) {
+                $anio = (int) $hoy->year;
+                if ($mes > (int) $hoy->month) {
+                    $anio--;
+                }
+            }
+
+            return [$mes, $anio];
+        }
+
+        if ((int) $hoy->day <= self::DIAS_GRACIA) {
+            $anterior = $hoy->copy()->startOfMonth()->subMonth();
+
+            return [(int) $anterior->month, (int) $anterior->year];
+        }
+
+        return [(int) $hoy->month, (int) $hoy->year];
+    }
+
+    public static function fechaEnMes(int $mes, int $anio, mixed $fecha = null): string
+    {
+        $inicio = Carbon::create($anio, $mes, 1)->startOfDay();
+        $fin = $inicio->copy()->endOfMonth()->startOfDay();
+        $elegida = $fecha ? Carbon::parse($fecha)->startOfDay() : now()->startOfDay();
+
+        if ($elegida->betweenIncluded($inicio, $fin)) {
+            return $elegida->toDateString();
+        }
+
+        $hoy = now()->startOfDay();
+        if ($hoy->betweenIncluded($inicio, $fin)) {
+            return $hoy->toDateString();
+        }
+        if ($hoy->gt($fin)) {
+            return $fin->toDateString();
+        }
+
+        return $inicio->toDateString();
+    }
+
+    public static function fechaCausacion(int $mesRelacionado, int $anioRelacionado, mixed $fecha = null): string
+    {
+        $fechaPago = $fecha ? Carbon::parse($fecha)->startOfDay() : now()->startOfDay();
+        [$mesGestion, $anioGestion] = self::mesGestion();
+        [$mesLiq, $anioLiq] = self::periodoLiquidacion($fechaPago, $mesRelacionado, $anioRelacionado);
+
+        $esMesTrabajo = $mesGestion === $mesRelacionado && $anioGestion === $anioRelacionado;
+        $caeEnFactura = $mesLiq === $mesRelacionado && $anioLiq === $anioRelacionado;
+
+        if ($esMesTrabajo || $caeEnFactura) {
+            return self::fechaEnMes($mesRelacionado, $anioRelacionado, $fechaPago);
+        }
+
+        return $fechaPago->toDateString();
+    }
+
     public static function limiteGracia(int $mes, int $anio): Carbon
     {
         return Carbon::create($anio, $mes, 1)->addMonth()->addDays(self::DIAS_GRACIA - 1)->endOfDay();

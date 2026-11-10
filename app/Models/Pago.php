@@ -60,6 +60,17 @@ class Pago extends Model
                 $ultimo = static::withTrashed()->max('id') ?? 0;
                 $pago->numero_recibo = 'REC-' . str_pad($ultimo + 1, 6, '0', STR_PAD_LEFT);
             }
+
+            if ($pago->factura_id) {
+                $factura = $pago->factura()->withTrashed()->first() ?? \App\Models\Factura::withTrashed()->find($pago->factura_id);
+                if ($factura && (int) $factura->mes >= 1 && (int) $factura->anio >= 2020) {
+                    $pago->fecha_pago = \App\Services\AtribucionPago::fechaCausacion(
+                        (int) $factura->mes,
+                        (int) $factura->anio,
+                        $pago->fecha_pago
+                    );
+                }
+            }
         });
 
         static::created(function ($pago) {

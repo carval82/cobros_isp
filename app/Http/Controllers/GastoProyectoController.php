@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\GastoProyecto;
 use App\Models\Proyecto;
 use App\Services\LiquidacionProyectoService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class GastoProyectoController extends Controller
 {
     public function index(Request $request)
     {
-        $mes = (int) $request->input('mes', now()->month);
-        $anio = (int) $request->input('anio', now()->year);
+        [$mes, $anio] = \App\Services\AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->input('mes') : null,
+            $request->filled('anio') ? (int) $request->input('anio') : null
+        );
         $proyectoId = $request->input('proyecto_id');
 
         $query = GastoProyecto::with(['proyecto', 'registradoPor'])
@@ -36,6 +39,7 @@ class GastoProyectoController extends Controller
             'anio' => $anio,
             'meses' => LiquidacionProyectoService::meses(),
             'categorias' => GastoProyecto::categorias(),
+            'fechaSugerida' => \App\Services\AtribucionPago::fechaEnMes($mes, $anio),
         ]);
     }
 
@@ -45,17 +49,37 @@ class GastoProyectoController extends Controller
             'proyecto_id' => 'required|exists:proyectos,id',
             'categoria' => 'required|string|max:50',
             'descripcion' => 'required|string|max:255',
-            'monto' => 'required|numeric|min:0',
+            'monto' => 'required|numeric|min:1',
             'fecha' => 'required|date',
             'proveedor' => 'nullable|string|max:255',
             'factura_numero' => 'nullable|string|max:50',
             'notas' => 'nullable|string',
         ]);
 
+        [$mesPeriodo, $anioPeriodo] = \App\Services\AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->input('mes') : null,
+            $request->filled('anio') ? (int) $request->input('anio') : null
+        );
+        $fecha = Carbon::parse(\App\Services\AtribucionPago::fechaEnMes(
+            $mesPeriodo,
+            $anioPeriodo,
+            $validated['fecha']
+        ));
+        $validated['fecha'] = $fecha->toDateString();
         $validated['registrado_por'] = $request->user()?->id;
         GastoProyecto::create($validated);
 
-        return back()->with('success', 'Gasto registrado');
+        $mes = (int) $fecha->month;
+        $anio = (int) $fecha->year;
+        $nombreMes = LiquidacionProyectoService::meses()[$mes] ?? $mes;
+
+        return redirect()
+            ->route('gastos.index', [
+                'proyecto_id' => $validated['proyecto_id'],
+                'mes' => $mes,
+                'anio' => $anio,
+            ])
+            ->with('success', 'Gasto registrado en '.$nombreMes.' '.$anio.'.');
     }
 
     public function update(Request $request, GastoProyecto $gasto)

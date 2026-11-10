@@ -184,7 +184,7 @@
                     <tbody>
                         @forelse($informe['gastos_detalle'] as $gasto)
                         <tr>
-                            <td>{{ $gasto->fecha->format('d/m/Y') }}</td>
+                            <td>{{ $gasto->fecha?->format('d/m/Y') ?? '—' }}</td>
                             <td>{{ \App\Models\GastoProyecto::categorias()[$gasto->categoria] ?? $gasto->categoria }}</td>
                             <td>{{ $gasto->descripcion }}</td>
                             <td class="text-end">${{ number_format($gasto->monto, 0, ',', '.') }}</td>

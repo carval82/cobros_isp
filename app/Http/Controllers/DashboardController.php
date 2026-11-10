@@ -14,8 +14,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $mes = now()->month;
-        $anio = now()->year;
+        [$mes, $anio] = \App\Services\AtribucionPago::mesGestion();
 
         $stats = [
             'clientes_activos' => Cliente::where('estado', 'activo')->count(),
@@ -23,7 +22,7 @@ class DashboardController extends Controller
             'servicios_activos' => Servicio::where('estado', 'activo')->count(),
             'facturas_pendientes' => Factura::whereIn('estado', ['pendiente', 'parcial', 'vencida'])->count(),
             'saldo_pendiente' => Factura::whereIn('estado', ['pendiente', 'parcial', 'vencida'])->sum('saldo'),
-            'recaudado_mes' => Pago::whereMonth('fecha_pago', $mes)->whereYear('fecha_pago', $anio)->sum('monto'),
+            'recaudado_mes' => \App\Services\AtribucionPago::aplicar(Pago::query(), $mes, $anio)->sum('monto'),
             'cobros_abiertos' => Cobro::where('estado', 'abierto')->count(),
             'cobradores_activos' => Cobrador::where('estado', 'activo')->count(),
         ];
@@ -48,6 +47,9 @@ class DashboardController extends Controller
             ->orderBy('fecha', 'desc')
             ->get();
 
-        return view('dashboard', compact('stats', 'facturasVencidas', 'ultimosPagos', 'cobrosAbiertos'));
+        $meses = \App\Services\LiquidacionProyectoService::meses();
+        $nombreMes = ($meses[$mes] ?? $mes).' '.$anio;
+
+        return view('dashboard', compact('stats', 'facturasVencidas', 'ultimosPagos', 'cobrosAbiertos', 'nombreMes'));
     }
 }

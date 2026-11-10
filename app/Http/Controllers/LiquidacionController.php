@@ -15,19 +15,15 @@ class LiquidacionController extends Controller
 {
     public function index(Request $request)
     {
-        $mes = (int) $request->input('mes', now()->month);
-        $anio = (int) $request->input('anio', now()->year);
-        if ($mes < 1 || $mes > 12) {
-            $mes = now()->month;
-        }
-        if ($anio < 2020) {
-            $anio = now()->year;
-        }
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->input('mes') : null,
+            $request->filled('anio') ? (int) $request->input('anio') : null
+        );
         $verTodas = $request->boolean('todas');
 
         $query = Liquidacion::query()
             ->select('liquidacions.*')
-            ->join('cobradors', 'cobradors.id', '=', 'liquidacions.cobrador_id')
+            ->leftJoin('cobradors', 'cobradors.id', '=', 'liquidacions.cobrador_id')
             ->with(['cobrador' => fn ($q) => $q->withTrashed()]);
 
         if (! $verTodas) {
@@ -50,8 +46,14 @@ class LiquidacionController extends Controller
             ->withQueryString();
         $cobradores = Cobrador::where('estado', 'activo')->orderBy('nombre')->get();
         $meses = CobradorInformeService::meses();
+        $informe = null;
+        try {
+            $informe = app(CobradorInformeService::class)->informeMensual($mes, $anio);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        return view('liquidaciones.index', compact('liquidaciones', 'cobradores', 'meses', 'mes', 'anio', 'verTodas'));
+        return view('liquidaciones.index', compact('liquidaciones', 'cobradores', 'meses', 'mes', 'anio', 'verTodas', 'informe'));
     }
 
     public function create()
@@ -201,14 +203,10 @@ class LiquidacionController extends Controller
 
     public function informeMensual(Request $request, CobradorInformeService $service)
     {
-        $mes = (int) $request->get('mes', now()->month);
-        $anio = (int) $request->get('anio', now()->year);
-        if ($mes < 1 || $mes > 12) {
-            $mes = now()->month;
-        }
-        if ($anio < 2020) {
-            $anio = now()->year;
-        }
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->get('mes') : null,
+            $request->filled('anio') ? (int) $request->get('anio') : null
+        );
         $informe = $service->informeMensual($mes, $anio);
         $meses = CobradorInformeService::meses();
 
@@ -217,14 +215,10 @@ class LiquidacionController extends Controller
 
     public function informeCobrador(Request $request, Cobrador $cobrador, CobradorInformeService $service)
     {
-        $mes = (int) $request->get('mes', now()->month);
-        $anio = (int) $request->get('anio', now()->year);
-        if ($mes < 1 || $mes > 12) {
-            $mes = now()->month;
-        }
-        if ($anio < 2020) {
-            $anio = now()->year;
-        }
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->get('mes') : null,
+            $request->filled('anio') ? (int) $request->get('anio') : null
+        );
         $detalle = $service->detalleCobrador($cobrador, $mes, $anio);
 
         return view('liquidaciones.informe-cobrador', compact('detalle', 'cobrador'));

@@ -59,8 +59,7 @@ class ProyectoController extends Controller
             'total_cobradores' => $proyecto->cobradoresAsignados->count(),
         ];
 
-        $mes = now()->month;
-        $anio = now()->year;
+        [$mes, $anio] = AtribucionPago::mesGestion();
 
         $clienteIds = $proyecto->clientes->pluck('id');
         

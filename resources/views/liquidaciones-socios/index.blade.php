@@ -18,13 +18,13 @@
 
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link" href="{{ route('liquidaciones.index') }}">Cobradores</a>
+        <a class="nav-link" href="{{ route('liquidaciones.index', ['mes' => $mes, 'anio' => $anio]) }}">Cobradores</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ route('liquidaciones.informe') }}">Proyección e informe</a>
+        <a class="nav-link" href="{{ route('liquidaciones.informe', ['mes' => $mes, 'anio' => $anio]) }}">Proyección e informe</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link active" href="{{ route('liquidaciones.socios') }}">Socios por proyecto</a>
+        <a class="nav-link active" href="{{ route('liquidaciones.socios', ['mes' => $mes, 'anio' => $anio]) }}">Socios por proyecto</a>
     </li>
 </ul>
 
@@ -47,6 +47,7 @@
                 <button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>Ver período</button>
             </div>
         </form>
+        <p class="text-muted small mb-0 mt-3">Hasta el día {{ \App\Services\AtribucionPago::DIAS_GRACIA }} se muestra {{ $meses[(int) $mes] ?? $mes }} {{ $anio }}. Cambia el mes si quieres ver otro período.</p>
     </div>
 </div>
 

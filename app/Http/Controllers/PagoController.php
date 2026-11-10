@@ -53,14 +53,10 @@ class PagoController extends Controller
     public function masivo(Request $request)
     {
         $proyectoId = (int) $request->input('proyecto_id');
-        $mes = (int) $request->input('mes');
-        $anio = (int) $request->input('anio');
-        if ($mes < 1 || $mes > 12) {
-            $mes = now()->month;
-        }
-        if ($anio < 2020) {
-            $anio = now()->year;
-        }
+        [$mes, $anio] = \App\Services\AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->input('mes') : null,
+            $request->filled('anio') ? (int) $request->input('anio') : null
+        );
 
         $facturas = collect();
         if ($proyectoId) {
@@ -118,7 +114,7 @@ class PagoController extends Controller
             return back()->with('error', 'Ninguna de las facturas marcadas tiene saldo por cobrar.');
         }
 
-        $fechaPago = $this->fechaDentroDelMes(
+        $fechaPago = \App\Services\AtribucionPago::fechaEnMes(
             (int) $validated['mes'],
             (int) $validated['anio'],
             $validated['fecha_pago']
@@ -179,27 +175,6 @@ class PagoController extends Controller
                 'anio' => $validated['anio'],
             ])
             ->with('success', 'Se aplicaron '.$cantidad.' pagos por $'.number_format($total, 0, ',', '.').' en la liquidación de '.(LiquidacionProyectoService::meses()[(int) $validated['mes']] ?? $validated['mes']).' '.$validated['anio'].'.');
-    }
-
-    private function fechaDentroDelMes(int $mes, int $anio, string $fecha): string
-    {
-        $inicio = Carbon::create($anio, $mes, 1)->startOfDay();
-        $fin = $inicio->copy()->endOfMonth()->startOfDay();
-        $elegida = Carbon::parse($fecha)->startOfDay();
-
-        if ($elegida->betweenIncluded($inicio, $fin)) {
-            return $elegida->toDateString();
-        }
-
-        $hoy = now()->startOfDay();
-        if ($hoy->lt($inicio)) {
-            return $inicio->toDateString();
-        }
-        if ($hoy->gt($fin)) {
-            return $fin->toDateString();
-        }
-
-        return $hoy->toDateString();
     }
 
     public function store(Request $request)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Proyecto;
+use App\Services\AtribucionPago;
 use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
 
@@ -14,14 +15,10 @@ class LiquidacionSocioController extends Controller
 
     public function index(Request $request)
     {
-        $mes = (int) $request->input('mes', now()->month);
-        $anio = (int) $request->input('anio', now()->year);
-        if ($mes < 1 || $mes > 12) {
-            $mes = now()->month;
-        }
-        if ($anio < 2020) {
-            $anio = now()->year;
-        }
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->input('mes') : null,
+            $request->filled('anio') ? (int) $request->input('anio') : null
+        );
 
         $informes = $this->service->resumenTodos($mes, $anio);
 
@@ -35,14 +32,10 @@ class LiquidacionSocioController extends Controller
 
     public function show(Request $request, Proyecto $proyecto)
     {
-        $mes = (int) $request->input('mes', now()->month);
-        $anio = (int) $request->input('anio', now()->year);
-        if ($mes < 1 || $mes > 12) {
-            $mes = now()->month;
-        }
-        if ($anio < 2020) {
-            $anio = now()->year;
-        }
+        [$mes, $anio] = AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->input('mes') : null,
+            $request->filled('anio') ? (int) $request->input('anio') : null
+        );
 
         $informe = $this->service->calcular($proyecto, $mes, $anio);
 

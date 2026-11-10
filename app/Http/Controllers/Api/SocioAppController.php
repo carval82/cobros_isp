@@ -114,8 +114,10 @@ class SocioAppController extends Controller
         }
 
         $proyecto = Proyecto::findOrFail($proyecto_id);
-        $mes = (int) $request->get('mes', Carbon::now()->month);
-        $anio = (int) $request->get('anio', Carbon::now()->year);
+        [$mes, $anio] = \App\Services\AtribucionPago::mesGestion(
+            $request->filled('mes') ? (int) $request->get('mes') : null,
+            $request->filled('anio') ? (int) $request->get('anio') : null
+        );
         $service = app(LiquidacionProyectoService::class);
         $informe = $service->calcular($proyecto, $mes, $anio);
         $mio = $informe['socios']->firstWhere('id', $participacion->id);
@@ -143,8 +145,9 @@ class SocioAppController extends Controller
         })->values();
 
         $historial = [];
+        $baseHistorial = Carbon::create($anio, $mes, 1)->startOfMonth();
         for ($i = 0; $i < 6; $i++) {
-            $fecha = Carbon::now()->subMonths($i);
+            $fecha = $baseHistorial->copy()->subMonths($i);
             $item = $service->calcular($proyecto, $fecha->month, $fecha->year);
             $mioMes = $item['socios']->firstWhere('id', $participacion->id);
             $historial[] = [

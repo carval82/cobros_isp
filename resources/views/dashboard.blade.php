@@ -59,7 +59,7 @@
         <div class="card stat-card success">
             <div class="card-body">
                 <div class="stat-value">${{ number_format($stats['recaudado_mes'], 0, ',', '.') }}</div>
-                <div class="stat-label">Recaudado este Mes</div>
+                <div class="stat-label">Recaudado {{ $nombreMes ?? 'este mes' }}</div>
             </div>
         </div>
     </div>
