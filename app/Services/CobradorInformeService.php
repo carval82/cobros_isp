@@ -32,7 +32,15 @@ class CobradorInformeService
             ->where('estado', 'activo')
             ->orderBy('nombre')
             ->get()
-            ->map(fn (Cobrador $cobrador) => $this->filaCobrador($cobrador, $mes, $anio, $desde, $hasta));
+            ->map(function (Cobrador $cobrador) use ($mes, $anio, $desde, $hasta) {
+                try {
+                    return $this->filaCobrador($cobrador, $mes, $anio, $desde, $hasta);
+                } catch (\Throwable $e) {
+                    report($e);
+
+                    return $this->filaVacia($cobrador, $e->getMessage());
+                }
+            });
 
         return [
             'mes' => $mes,
@@ -320,6 +328,29 @@ class CobradorInformeService
             'liquidacion_id' => $liquidacion?->id,
             'liquidacion_estado' => $liquidacion?->estado,
             'proyectos' => $proyectosFila,
+            'error' => null,
+        ];
+    }
+
+    private function filaVacia(Cobrador $cobrador, string $error): array
+    {
+        return [
+            'id' => $cobrador->id,
+            'nombre' => $cobrador->nombre,
+            'documento' => $cobrador->documento,
+            'comision_porcentaje' => (float) ($cobrador->comision_porcentaje ?? 0),
+            'clientes' => 0,
+            'proyectado' => 0,
+            'recaudado' => 0,
+            'recaudado_cartera' => 0,
+            'pendiente' => 0,
+            'cumplimiento' => 0,
+            'comision' => 0,
+            'a_entregar' => 0,
+            'liquidacion_id' => null,
+            'liquidacion_estado' => null,
+            'proyectos' => collect(),
+            'error' => $error,
         ];
     }
 
@@ -327,21 +358,42 @@ class CobradorInformeService
     {
         $pagos = $facturas->isEmpty()
             ? collect()
-            : Pago::whereIn('factura_id', $facturas->pluck('id'))->get(['factura_id', 'monto', 'fecha_pago']);
+            : DB::table('pagos')
+                ->whereIn('factura_id', $facturas->pluck('id'))
+                ->whereNull('deleted_at')
+                ->get(['factura_id', 'monto', 'fecha_pago']);
 
         return $facturas->map(function (Factura $factura) use ($pagos) {
-            $inicio = Carbon::create((int) $factura->anio, (int) $factura->mes, 1)->startOfDay();
-            $limite = AtribucionPago::limiteGracia((int) $factura->mes, (int) $factura->anio);
-            $delMes = $pagos->filter(function (Pago $pago) use ($factura, $inicio, $limite) {
+            $mesFactura = (int) $factura->mes;
+            $anioFactura = (int) $factura->anio;
+            if ($mesFactura < 1 || $mesFactura > 12 || $anioFactura < 2000) {
+                return [
+                    'id' => $factura->id,
+                    'numero' => $factura->numero,
+                    'total' => (float) ($factura->total ?? 0),
+                    'pagado_mes' => 0,
+                    'pagado_despues' => 0,
+                    'pendiente_mes' => (float) ($factura->total ?? 0),
+                    'estado_mes' => $factura->estado === 'anulada' ? 'anulada' : 'pendiente',
+                ];
+            }
+
+            $inicio = Carbon::create($anioFactura, $mesFactura, 1)->startOfDay();
+            $limite = AtribucionPago::limiteGracia($mesFactura, $anioFactura);
+            $delMes = $pagos->filter(function ($pago) use ($factura, $inicio, $limite) {
+                $fecha = $this->fechaValida($pago->fecha_pago ?? null);
+
                 return (int) $pago->factura_id === (int) $factura->id
-                    && $pago->fecha_pago
-                    && $pago->fecha_pago->gte($inicio)
-                    && $pago->fecha_pago->lte($limite);
+                    && $fecha
+                    && $fecha->gte($inicio)
+                    && $fecha->lte($limite);
             });
-            $despues = $pagos->filter(function (Pago $pago) use ($factura, $limite) {
+            $despues = $pagos->filter(function ($pago) use ($factura, $limite) {
+                $fecha = $this->fechaValida($pago->fecha_pago ?? null);
+
                 return (int) $pago->factura_id === (int) $factura->id
-                    && $pago->fecha_pago
-                    && $pago->fecha_pago->gt($limite);
+                    && $fecha
+                    && $fecha->gt($limite);
             });
 
             $pagadoMes = (float) $delMes->sum('monto');
@@ -361,12 +413,25 @@ class CobradorInformeService
             return [
                 'id' => $factura->id,
                 'numero' => $factura->numero,
-                'total' => (float) $factura->total,
+                'total' => (float) ($factura->total ?? 0),
                 'pagado_mes' => $pagadoMes,
                 'pagado_despues' => $pagadoDespues,
                 'pendiente_mes' => $pendienteMes,
                 'estado_mes' => $estado,
             ];
         });
+    }
+
+    private function fechaValida(mixed $fecha): ?Carbon
+    {
+        if (! $fecha) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($fecha);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

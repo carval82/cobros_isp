@@ -114,7 +114,10 @@
                     <tr class="table-light">
                         <td>
                             <strong>{{ $fila['nombre'] }}</strong>
-                            <br><small class="text-muted">{{ $fila['documento'] }} · {{ number_format($fila['comision_porcentaje'], 1) }}%</small>
+                            <br><small class="text-muted">{{ $fila['documento'] }} · {{ number_format((float) ($fila['comision_porcentaje'] ?? 0), 1) }}%</small>
+                            @if(!empty($fila['error']))
+                                <br><small class="text-danger">{{ $fila['error'] }}</small>
+                            @endif
                         </td>
                         <td class="text-center fw-bold">{{ $fila['clientes'] }}</td>
                         <td class="text-end fw-bold">${{ number_format($fila['proyectado'], 0, ',', '.') }}</td>
@@ -129,7 +132,7 @@
                         <td class="text-center">
                             @if($fila['liquidacion_id'])
                                 <span class="badge bg-{{ $fila['liquidacion_estado'] === 'pagada' ? 'success' : 'warning' }}">
-                                    {{ ucfirst($fila['liquidacion_estado']) }}
+                                    {{ ucfirst((string) ($fila['liquidacion_estado'] ?? '')) }}
                                 </span>
                             @else
                                 <span class="badge bg-secondary">Sin liquidar</span>
