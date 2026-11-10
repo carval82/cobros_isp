@@ -46,7 +46,7 @@ class Cobro extends Model
     {
         $this->total_recaudado = $this->pagos()->sum('monto');
         $this->cantidad_pagos = $this->pagos()->count();
-        $this->total_comision = $this->total_recaudado * ($this->cobrador->comision_porcentaje / 100);
+        $this->total_comision = $this->comisionSobre($this->total_recaudado);
         $this->estado = 'cerrado';
         $this->fecha_cierre = now();
         $this->save();
@@ -56,7 +56,15 @@ class Cobro extends Model
     {
         $this->total_recaudado = $this->pagos()->sum('monto');
         $this->cantidad_pagos = $this->pagos()->count();
-        $this->total_comision = $this->total_recaudado * ($this->cobrador->comision_porcentaje / 100);
+        $this->total_comision = $this->comisionSobre($this->total_recaudado);
         $this->save();
+    }
+
+    private function comisionSobre(float|string|null $recaudado): float
+    {
+        $cobrador = $this->cobrador()->withTrashed()->first();
+        $porcentaje = (float) ($cobrador?->comision_porcentaje ?? 0);
+
+        return round((float) $recaudado * ($porcentaje / 100), 2);
     }
 }

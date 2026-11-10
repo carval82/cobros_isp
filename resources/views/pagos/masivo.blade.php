@@ -46,7 +46,7 @@
                 </button>
             </div>
         </form>
-        <p class="text-muted small mb-0 mt-3">Marca las facturas y se cobra el saldo completo de cada una. Las que ya están pagadas no aparecen.</p>
+        <p class="text-muted small mb-0 mt-3">Marca las facturas y se cobra el saldo completo de cada una. El pago entra en la liquidación de ese mes, no en el mes que va en curso.</p>
     </div>
 </div>
 
@@ -60,9 +60,14 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="row g-3">
+                @php
+                    $inicioMes = \Carbon\Carbon::create((int) $anio, (int) $mes, 1);
+                    $finMes = $inicioMes->copy()->endOfMonth();
+                    $fechaSugerida = now()->lt($inicioMes) ? $inicioMes : (now()->gt($finMes) ? $finMes : now());
+                @endphp
                 <div class="col-md-3">
-                    <label class="form-label">Fecha de pago</label>
-                    <input type="date" name="fecha_pago" class="form-control @error('fecha_pago') is-invalid @enderror" value="{{ old('fecha_pago', now()->format('Y-m-d')) }}" required>
+                    <label class="form-label">Fecha en {{ $meses[(int) $mes] ?? $mes }} {{ $anio }}</label>
+                    <input type="date" name="fecha_pago" class="form-control @error('fecha_pago') is-invalid @enderror" min="{{ $inicioMes->format('Y-m-d') }}" max="{{ $finMes->format('Y-m-d') }}" value="{{ old('fecha_pago', $fechaSugerida->format('Y-m-d')) }}" required>
                     @error('fecha_pago')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-3">

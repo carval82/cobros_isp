@@ -17,12 +17,18 @@ class LiquidacionController extends Controller
     {
         $mes = (int) $request->input('mes', now()->month);
         $anio = (int) $request->input('anio', now()->year);
+        if ($mes < 1 || $mes > 12) {
+            $mes = now()->month;
+        }
+        if ($anio < 2020) {
+            $anio = now()->year;
+        }
         $verTodas = $request->boolean('todas');
 
         $query = Liquidacion::query()
             ->select('liquidacions.*')
             ->join('cobradors', 'cobradors.id', '=', 'liquidacions.cobrador_id')
-            ->with('cobrador');
+            ->with(['cobrador' => fn ($q) => $q->withTrashed()]);
 
         if (! $verTodas) {
             $query->whereMonth('liquidacions.fecha_desde', $mes)
@@ -114,7 +120,10 @@ class LiquidacionController extends Controller
 
     public function show(Liquidacion $liquidacione)
     {
-        $liquidacione->load(['cobrador', 'cobros.pagos']);
+        $liquidacione->load([
+            'cobrador' => fn ($q) => $q->withTrashed(),
+            'cobros.pagos',
+        ]);
         $pagos = AtribucionPago::aplicar(
             Pago::with(['factura.cliente'])->where('cobrador_id', $liquidacione->cobrador_id),
             (int) $liquidacione->fecha_desde->month,
@@ -194,6 +203,12 @@ class LiquidacionController extends Controller
     {
         $mes = (int) $request->get('mes', now()->month);
         $anio = (int) $request->get('anio', now()->year);
+        if ($mes < 1 || $mes > 12) {
+            $mes = now()->month;
+        }
+        if ($anio < 2020) {
+            $anio = now()->year;
+        }
         $informe = $service->informeMensual($mes, $anio);
         $meses = CobradorInformeService::meses();
 
@@ -204,6 +219,12 @@ class LiquidacionController extends Controller
     {
         $mes = (int) $request->get('mes', now()->month);
         $anio = (int) $request->get('anio', now()->year);
+        if ($mes < 1 || $mes > 12) {
+            $mes = now()->month;
+        }
+        if ($anio < 2020) {
+            $anio = now()->year;
+        }
         $detalle = $service->detalleCobrador($cobrador, $mes, $anio);
 
         return view('liquidaciones.informe-cobrador', compact('detalle', 'cobrador'));

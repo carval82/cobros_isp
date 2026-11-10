@@ -16,6 +16,12 @@ class LiquidacionSocioController extends Controller
     {
         $mes = (int) $request->input('mes', now()->month);
         $anio = (int) $request->input('anio', now()->year);
+        if ($mes < 1 || $mes > 12) {
+            $mes = now()->month;
+        }
+        if ($anio < 2020) {
+            $anio = now()->year;
+        }
 
         $informes = $this->service->resumenTodos($mes, $anio);
 
@@ -31,6 +37,12 @@ class LiquidacionSocioController extends Controller
     {
         $mes = (int) $request->input('mes', now()->month);
         $anio = (int) $request->input('anio', now()->year);
+        if ($mes < 1 || $mes > 12) {
+            $mes = now()->month;
+        }
+        if ($anio < 2020) {
+            $anio = now()->year;
+        }
 
         $informe = $this->service->calcular($proyecto, $mes, $anio);
 

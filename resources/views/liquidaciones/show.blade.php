@@ -39,7 +39,7 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tr>
                         <td class="text-muted">Cobrador:</td>
-                        <td><strong>{{ $liquidacion->cobrador->nombre }}</strong></td>
+                        <td><strong>{{ $liquidacion->cobrador->nombre ?? 'Cobrador eliminado' }}</strong></td>
                     </tr>
                     <tr>
                         <td class="text-muted">Período:</td>
@@ -47,7 +47,7 @@
                     </tr>
                     <tr>
                         <td class="text-muted">Fecha Liquidación:</td>
-                        <td>{{ $liquidacion->fecha_liquidacion->format('d/m/Y') }}</td>
+                        <td>{{ $liquidacion->fecha_liquidacion?->format('d/m/Y') ?? '—' }}</td>
                     </tr>
                     <tr>
                         <td class="text-muted">Estado:</td>
@@ -106,7 +106,7 @@
                     <tbody>
                         @foreach($liquidacion->cobros as $cobro)
                         <tr>
-                            <td>{{ $cobro->fecha->format('d/m/Y') }}</td>
+                            <td>{{ $cobro->fecha?->format('d/m/Y') ?? '—' }}</td>
                             <td class="text-end">${{ number_format($cobro->total_recaudado, 0, ',', '.') }}</td>
                             <td class="text-end">${{ number_format($cobro->total_comision, 0, ',', '.') }}</td>
                             <td class="text-center">{{ $cobro->cantidad_pagos }}</td>
@@ -144,9 +144,9 @@
                     <tbody>
                         @forelse($pagos as $pago)
                         <tr>
-                            <td>{{ $pago->fecha_pago->format('d/m/Y') }}</td>
-                            <td>{{ $pago->factura->cliente->nombre ?? '—' }}</td>
-                            <td>{{ $pago->factura->numero ?? '—' }}</td>
+                            <td>{{ $pago->fecha_pago?->format('d/m/Y') ?? '—' }}</td>
+                            <td>{{ $pago->factura?->cliente?->nombre ?? '—' }}</td>
+                            <td>{{ $pago->factura?->numero ?? '—' }}</td>
                             <td class="text-end">${{ number_format($pago->monto, 0, ',', '.') }}</td>
                             <td class="text-end">{{ $pago->descuento > 0 ? '$'.number_format($pago->descuento, 0, ',', '.') : '—' }}</td>
                             <td class="small">{{ $pago->justificacion_descuento ?: '—' }}</td>

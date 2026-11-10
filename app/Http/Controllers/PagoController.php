@@ -9,6 +9,7 @@ use App\Models\Cobro;
 use App\Models\Liquidacion;
 use App\Models\Proyecto;
 use App\Services\LiquidacionProyectoService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -117,17 +118,34 @@ class PagoController extends Controller
             return back()->with('error', 'Ninguna de las facturas marcadas tiene saldo por cobrar.');
         }
 
+        $fechaPago = $this->fechaDentroDelMes(
+            (int) $validated['mes'],
+            (int) $validated['anio'],
+            $validated['fecha_pago']
+        );
         $cantidad = 0;
         $total = 0.0;
 
-        DB::transaction(function () use ($facturas, $validated, &$cantidad, &$total) {
+        DB::transaction(function () use ($facturas, $validated, $fechaPago, &$cantidad, &$total) {
             $cobroId = null;
             if (! empty($validated['cobrador_id'])) {
-                $cobro = Cobro::firstOrCreate(
-                    ['cobrador_id' => $validated['cobrador_id'], 'estado' => 'abierto'],
-                    ['fecha' => $validated['fecha_pago'], 'total_recaudado' => 0]
-                );
-                $cobroId = $cobro->id;
+                $inicio = Carbon::create((int) $validated['anio'], (int) $validated['mes'], 1)->startOfDay();
+                $fin = $inicio->copy()->endOfMonth();
+                $cobro = Cobro::where('cobrador_id', $validated['cobrador_id'])
+                    ->where('estado', 'abierto')
+                    ->whereBetween('fecha', [$inicio->toDateString(), $fin->toDateString()])
+                    ->first();
+
+                if (! $cobro && $inicio->isSameMonth(now())) {
+                    $cobro = Cobro::create([
+                        'cobrador_id' => $validated['cobrador_id'],
+                        'estado' => 'abierto',
+                        'fecha' => $fechaPago,
+                        'total_recaudado' => 0,
+                    ]);
+                }
+
+                $cobroId = $cobro?->id;
             }
 
             foreach ($facturas as $factura) {
@@ -140,7 +158,7 @@ class PagoController extends Controller
                 Pago::create([
                     'factura_id' => $factura->id,
                     'monto' => $saldo,
-                    'fecha_pago' => $validated['fecha_pago'],
+                    'fecha_pago' => $fechaPago,
                     'metodo_pago' => $validated['metodo_pago'],
                     'cobrador_id' => $validated['cobrador_id'] ?? null,
                     'cobro_id' => $cobroId,
@@ -160,7 +178,28 @@ class PagoController extends Controller
                 'mes' => $validated['mes'],
                 'anio' => $validated['anio'],
             ])
-            ->with('success', 'Se aplicaron '.$cantidad.' pagos por $'.number_format($total, 0, ',', '.').'. Cada factura marcada quedó saldada.');
+            ->with('success', 'Se aplicaron '.$cantidad.' pagos por $'.number_format($total, 0, ',', '.').' en la liquidación de '.(LiquidacionProyectoService::meses()[(int) $validated['mes']] ?? $validated['mes']).' '.$validated['anio'].'.');
+    }
+
+    private function fechaDentroDelMes(int $mes, int $anio, string $fecha): string
+    {
+        $inicio = Carbon::create($anio, $mes, 1)->startOfDay();
+        $fin = $inicio->copy()->endOfMonth()->startOfDay();
+        $elegida = Carbon::parse($fecha)->startOfDay();
+
+        if ($elegida->betweenIncluded($inicio, $fin)) {
+            return $elegida->toDateString();
+        }
+
+        $hoy = now()->startOfDay();
+        if ($hoy->lt($inicio)) {
+            return $inicio->toDateString();
+        }
+        if ($hoy->gt($fin)) {
+            return $fin->toDateString();
+        }
+
+        return $hoy->toDateString();
     }
 
     public function store(Request $request)

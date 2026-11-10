@@ -168,7 +168,11 @@ class CobradorInformeService
 
     public function recalcular(Liquidacion $liquidacion): Liquidacion
     {
-        $cobrador = $liquidacion->cobrador;
+        $cobrador = $liquidacion->cobrador()->withTrashed()->first();
+        if (! $cobrador || ! $liquidacion->fecha_desde) {
+            return $liquidacion;
+        }
+
         $pagosPeriodo = AtribucionPago::aplicar(
             Pago::where('cobrador_id', $liquidacion->cobrador_id),
             (int) $liquidacion->fecha_desde->month,
@@ -330,11 +334,13 @@ class CobradorInformeService
             $limite = AtribucionPago::limiteGracia((int) $factura->mes, (int) $factura->anio);
             $delMes = $pagos->filter(function (Pago $pago) use ($factura, $inicio, $limite) {
                 return (int) $pago->factura_id === (int) $factura->id
+                    && $pago->fecha_pago
                     && $pago->fecha_pago->gte($inicio)
                     && $pago->fecha_pago->lte($limite);
             });
             $despues = $pagos->filter(function (Pago $pago) use ($factura, $limite) {
                 return (int) $pago->factura_id === (int) $factura->id
+                    && $pago->fecha_pago
                     && $pago->fecha_pago->gt($limite);
             });
 

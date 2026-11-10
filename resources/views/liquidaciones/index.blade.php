@@ -82,8 +82,8 @@
                     @forelse($liquidaciones as $liquidacion)
                     <tr>
                         <td><strong>{{ $liquidacion->numero }}</strong></td>
-                        <td>{{ $liquidacion->cobrador->nombre }}</td>
-                        <td>{{ $liquidacion->fecha_desde->format('d/m') }} - {{ $liquidacion->fecha_hasta->format('d/m/Y') }}</td>
+                        <td>{{ $liquidacion->cobrador->nombre ?? 'Cobrador eliminado' }}</td>
+                        <td>{{ $liquidacion->fecha_desde?->format('d/m') }} - {{ $liquidacion->fecha_hasta?->format('d/m/Y') }}</td>
                         <td class="text-end">${{ number_format($liquidacion->total_recaudado, 0, ',', '.') }}</td>
                         <td class="text-end text-primary">${{ number_format($liquidacion->total_comision, 0, ',', '.') }}</td>
                         <td class="text-end fw-bold">${{ number_format($liquidacion->total_a_entregar, 0, ',', '.') }}</td>
