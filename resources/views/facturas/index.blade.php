@@ -72,6 +72,9 @@
                 <button type="submit" class="btn btn-danger" formaction="{{ route('facturas.exportar.pdf') }}">
                     <i class="fas fa-file-pdf me-1"></i>PDF
                 </button>
+                <a href="{{ route('pagos.masivo', request()->only(['proyecto_id', 'mes', 'anio'])) }}" class="btn btn-success">
+                    <i class="fas fa-check-double me-1"></i>Pagos masivos
+                </a>
             </div>
         </form>
         @if($resumen)

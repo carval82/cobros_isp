@@ -45,6 +45,8 @@ Route::middleware('auth')->group(function () {
     Route::get('facturas/exportar-pdf', [FacturaController::class, 'exportarPdf'])->name('facturas.exportar.pdf');
     Route::resource('facturas', FacturaController::class);
     Route::resource('cobros', CobroController::class);
+    Route::get('pagos/masivo', [PagoController::class, 'masivo'])->name('pagos.masivo');
+    Route::post('pagos/masivo', [PagoController::class, 'aplicarMasivo'])->name('pagos.masivo.aplicar');
     Route::resource('pagos', PagoController::class);
     Route::resource('liquidaciones', LiquidacionController::class);
 

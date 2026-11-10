@@ -8,6 +8,9 @@
         <i class="fas fa-money-bill-wave me-2"></i>Pagos
     </h1>
     <div class="btn-group">
+        <a href="{{ route('pagos.masivo') }}" class="btn btn-success">
+            <i class="fas fa-check-double me-1"></i>Pagos masivos
+        </a>
         <a href="{{ route('pagos.create') }}" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i>Nuevo Pago
         </a>

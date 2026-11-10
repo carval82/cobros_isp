@@ -7,7 +7,10 @@ use App\Models\Factura;
 use App\Models\Cobrador;
 use App\Models\Cobro;
 use App\Models\Liquidacion;
+use App\Models\Proyecto;
+use App\Services\LiquidacionProyectoService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PagoController extends Controller
 {
@@ -44,6 +47,120 @@ class PagoController extends Controller
             : null;
 
         return view('pagos.create', compact('facturas', 'cobradores', 'cobrosAbiertos', 'facturaSeleccionada'));
+    }
+
+    public function masivo(Request $request)
+    {
+        $proyectoId = (int) $request->input('proyecto_id');
+        $mes = (int) $request->input('mes');
+        $anio = (int) $request->input('anio');
+        if ($mes < 1 || $mes > 12) {
+            $mes = now()->month;
+        }
+        if ($anio < 2020) {
+            $anio = now()->year;
+        }
+
+        $facturas = collect();
+        if ($proyectoId) {
+            $facturas = Factura::with('cliente')
+                ->where('saldo', '>', 0)
+                ->whereNotIn('estado', ['anulada', 'pagada'])
+                ->where('mes', $mes)
+                ->where('anio', $anio)
+                ->whereHas('cliente', fn ($q) => $q->where('proyecto_id', $proyectoId))
+                ->get()
+                ->sortBy(fn (Factura $factura) => mb_strtolower($factura->cliente->nombre ?? ''))
+                ->values();
+        }
+
+        return view('pagos.masivo', [
+            'proyectos' => Proyecto::where('activo', true)->orderBy('nombre')->get(),
+            'cobradores' => Cobrador::where('estado', 'activo')->orderBy('nombre')->get(),
+            'meses' => LiquidacionProyectoService::meses(),
+            'facturas' => $facturas,
+            'proyectoId' => $proyectoId,
+            'mes' => $mes,
+            'anio' => $anio,
+        ]);
+    }
+
+    public function aplicarMasivo(Request $request)
+    {
+        $request->merge([
+            'cobrador_id' => $request->input('cobrador_id') ?: null,
+        ]);
+
+        $validated = $request->validate([
+            'proyecto_id' => 'required|exists:proyectos,id',
+            'mes' => 'required|integer|min:1|max:12',
+            'anio' => 'required|integer|min:2020|max:2035',
+            'facturas' => 'required|array|min:1',
+            'facturas.*' => 'integer|exists:facturas,id',
+            'fecha_pago' => 'required|date',
+            'metodo_pago' => 'required|in:efectivo,transferencia,nequi,daviplata,tarjeta,otro',
+            'cobrador_id' => 'nullable|exists:cobradors,id',
+            'referencia_pago' => 'nullable|string|max:100',
+            'notas' => 'nullable|string|max:500',
+        ]);
+
+        $facturas = Factura::with('cliente')
+            ->whereIn('id', $validated['facturas'])
+            ->where('saldo', '>', 0)
+            ->whereNotIn('estado', ['anulada', 'pagada'])
+            ->where('mes', $validated['mes'])
+            ->where('anio', $validated['anio'])
+            ->whereHas('cliente', fn ($q) => $q->where('proyecto_id', $validated['proyecto_id']))
+            ->get();
+
+        if ($facturas->isEmpty()) {
+            return back()->with('error', 'Ninguna de las facturas marcadas tiene saldo por cobrar.');
+        }
+
+        $cantidad = 0;
+        $total = 0.0;
+
+        DB::transaction(function () use ($facturas, $validated, &$cantidad, &$total) {
+            $cobroId = null;
+            if (! empty($validated['cobrador_id'])) {
+                $cobro = Cobro::firstOrCreate(
+                    ['cobrador_id' => $validated['cobrador_id'], 'estado' => 'abierto'],
+                    ['fecha' => $validated['fecha_pago'], 'total_recaudado' => 0]
+                );
+                $cobroId = $cobro->id;
+            }
+
+            foreach ($facturas as $factura) {
+                $factura->refresh();
+                $saldo = round((float) $factura->saldo, 2);
+                if ($saldo <= 0) {
+                    continue;
+                }
+
+                Pago::create([
+                    'factura_id' => $factura->id,
+                    'monto' => $saldo,
+                    'fecha_pago' => $validated['fecha_pago'],
+                    'metodo_pago' => $validated['metodo_pago'],
+                    'cobrador_id' => $validated['cobrador_id'] ?? null,
+                    'cobro_id' => $cobroId,
+                    'referencia_pago' => $validated['referencia_pago'] ?? null,
+                    'notas' => $validated['notas'] ?? 'Pago masivo',
+                    'user_id' => auth()->id(),
+                ]);
+
+                $cantidad++;
+                $total += $saldo;
+            }
+        });
+
+        return redirect()
+            ->route('pagos.masivo', [
+                'proyecto_id' => $validated['proyecto_id'],
+                'mes' => $validated['mes'],
+                'anio' => $validated['anio'],
+            ])
+            ->with('success', 'Se aplicaron '.$cantidad.' pagos por $'.number_format($total, 0, ',', '.').'. Cada factura marcada quedó saldada.');
     }
 
     public function store(Request $request)
