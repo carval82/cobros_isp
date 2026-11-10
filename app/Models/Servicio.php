@@ -55,6 +55,14 @@ class Servicio extends Model
 
     public function tieneFacturaMes(int $mes, int $anio): bool
     {
-        return $this->facturas()->where('mes', $mes)->where('anio', $anio)->exists();
+        $factura = $this->facturas()->withTrashed()->where('mes', $mes)->where('anio', $anio)->first();
+        if (! $factura) {
+            return false;
+        }
+        if ($factura->trashed() && $factura->estado !== 'anulada') {
+            $factura->restore();
+        }
+
+        return true;
     }
 }

@@ -647,14 +647,18 @@ class CobradorAppController extends Controller
                 continue;
             }
 
-            // Verificar si ya existe factura para este mes
-            $facturaExiste = Factura::where('cliente_id', $cliente->id)
+            $facturaExiste = Factura::withTrashed()
                 ->where('servicio_id', $servicio->id)
                 ->where('mes', $mes)
                 ->where('anio', $anio)
-                ->exists();
+                ->first();
 
-            if ($facturaExiste) continue;
+            if ($facturaExiste) {
+                if ($facturaExiste->trashed() && $facturaExiste->estado !== 'anulada') {
+                    $facturaExiste->restore();
+                }
+                continue;
+            }
 
             // Generar factura si el día actual es >= día de corte
             if ($diaActual >= $servicio->dia_corte) {
